@@ -290,6 +290,9 @@ const ARMAS = {
   acr:      { nome: 'ACR',             tipo: 'fuzil',    preco: 3100, dano: 33,  cadencia: 11.5, pente: 30, reserva: 90,  recarga: 2.4, auto: true,  spread: 0.008, recuo: 0.022, alcance: 160, slot: 1 },
   type95:   { nome: 'Type 95 (rajada)',tipo: 'fuzil',    preco: 2900, dano: 37,  cadencia: 14,   pente: 30, reserva: 90,  recarga: 2.7, auto: false, spread: 0.007, recuo: 0.02,  alcance: 170, slot: 1, rajada: 3, pausaRajada: 0.24 },
   minigun:  { nome: 'Minigun',         tipo: 'mg',       preco: 6000, dano: 22,  cadencia: 25,   pente: 200,reserva: 200, recarga: 6.0, auto: true,  spread: 0.034, recuo: 0.012, alcance: 110, slot: 1, giro: 0.55, peso: 0.68 },
+  scout:    { nome: 'Scout (ferrolho)',tipo: 'sniper',   preco: 2500, dano: 80,  cadencia: 1.3,  pente: 10, reserva: 60,  recarga: 2.2, auto: false, spread: 0.003, recuo: 0.06,  alcance: 300, slot: 1, zoom: 38, spreadSemZoom: 0.05 },
+  barrett:  { nome: 'Barrett .50 (semi)', tipo: 'sniper', preco: 3600, dano: 90,  cadencia: 2.2,  pente: 10, reserva: 40,  recarga: 3.4, auto: false, spread: 0.004, recuo: 0.1,   alcance: 300, slot: 1, zoom: 28, spreadSemZoom: 0.06, perfura: true },
+  awm:      { nome: 'AWM .338',         tipo: 'sniper',   preco: 4200, dano: 130, cadencia: 0.8,  pente: 5,  reserva: 30,  recarga: 3.2, auto: false, spread: 0.002, recuo: 0.12,  alcance: 300, slot: 1, zoom: 22, spreadSemZoom: 0.08 },
   bazuca:   { nome: 'Bazuca',          tipo: 'lancador', preco: 4500, dano: 190, cadencia: 0.8,  pente: 1,  reserva: 3,   recarga: 3.2, auto: false, spread: 0.004, recuo: 0.14,  alcance: 200, slot: 1, raioExplosao: 6.5, velProjetil: 42, peso: 0.85 },
 };
 const EQUIPAMENTOS = {
@@ -553,10 +556,10 @@ function plataforma(x1, z1, x2, z2, topo) {
   // guarda-corpos baixos nas bordas que não têm rampa são adicionados pelas rampas/chamadas específicas
   for (const [a, b, c, d] of [[x1, z1, x1 + 0.3, z2], [x2 - 0.3, z1, x2, z2]]) { const m = bloco(c - a, 1.0, d - b, '#5a4a3a'); m.position.set((a + c) / 2, topo + 0.5, (b + d) / 2); scene.add(m); SOLIDOS.push({ min: new THREE.Vector3(a, topo, b), max: new THREE.Vector3(c, topo + 1.0, d) }); }
 }
-function rampa(x1, z1, x2, z2, topo, dir) { // dir: lado em que a rampa está mais alta ('z+' sobe para z menor... ver uso)
+function rampa(x1, z1, x2, z2, topo, dir, base = 0) { // dir: lado em que a rampa está mais alta; base: altura do piso de onde ela parte
   const n = 8, comp = dir[0] === 'z' ? (z2 - z1) / n : (x2 - x1) / n;
   for (let k = 0; k < n; k++) {
-    const hk = topo * (k + 1) / n;
+    const hk = base + (topo - base) * (k + 1) / n;
     let a, b, c, d;
     if (dir === 'z+') { a = x1; c = x2; d = z2 - k * comp; b = d - comp; }          // sobe no sentido de z decrescente (entra pelo sul)
     else if (dir === 'z-') { a = x1; c = x2; b = z1 + k * comp; d = b + comp; }     // sobe no sentido de z crescente (entra pelo norte)
@@ -838,8 +841,8 @@ function colinas(cor, n = 14, dist = 170) { for (let i = 0; i < n; i++) { const 
 // ---- esquadrias: moldura + vidro (o vidro não bloqueia tiro nem passagem) ----
 let MAT_VIDRO = null, MAT_MOLDURA = null;
 function esquadria(cx, cz, larg, base, topo, eixo, esp, porta) {
-  MAT_VIDRO = MAT_VIDRO || mat('#9fcbe0', { transparent: true, opacity: 0.32, roughness: 0.1, metalness: 0.5, side: THREE.DoubleSide });
-  MAT_MOLDURA = MAT_MOLDURA || mat('#f1eee6', { roughness: 0.6 });
+  MAT_VIDRO = MAT_VIDRO || mat('#7fb8de', { transparent: true, opacity: 0.5, roughness: 0.05, metalness: 0.6, side: THREE.DoubleSide });
+  MAT_MOLDURA = MAT_MOLDURA || mat('#3b3a38', { roughness: 0.6 });
   const alt = topo - base, g = new THREE.Group(); const b = 0.09, prof = esp + 0.12;
   const barra = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), MAT_MOLDURA); m.position.set(x, y, z); m.castShadow = true; g.add(m); };
   barra(larg + b * 2, b, prof, 0, topo + b / 2, 0);
@@ -933,6 +936,9 @@ function metadeVila(corCasa, corCarro) {
   // ---- frente: calçada, cerquinha, árvore, caixa de correio, poste ----
   pisoVisual(-34, -16, -8, -12, 'concreto'); pisoVisual(10, -16, 18, -9, 'concreto'); pisoVisual(-22, -13.6, -20, -9, 'concreto');
   cerca(-36, -12.15, -24, -11.85, 0.9); cerca(-18, -12.15, -8, -11.85, 0.9); cerca(20, -12.15, 34, -11.85, 0.9);
+  caixa(-36, -11.6, -30, -10.8, 1.3, '#3d6b2c'); caixa(-14, -11.6, -8, -10.8, 1.3, '#3d6b2c'); caixa(24, -11.6, 34, -10.8, 1.3, '#3d6b2c'); // sebes atrás das cerquinhas
+  caixa(-38, -8.2, -36.4, -7.4, 1.0, '#6a6e72'); caixa(-33, -20, -30.5, -18.6, 1.5, '#4a4a4a'); // caçamba e lixeira
+  movel(-36, -29, -34.5, -27, 0.8, '#7a6a5a'); pilhaCaixas(24, -34);
   arvore(-8, -15, 5.5, 2.4); arvore(24, -14.5, 5, 2.2); arbusto(-33, -14); arbusto(-31, -14.5); arbusto(6, -15);
   const cc = bloco(0.25, 0.25, 0.4, '#3a3a3a'); colocar(cc, -19.2, 1.1, -11); const pc = bloco(0.06, 1.0, 0.06, '#666'); colocar(pc, -19.2, 0.5, -11);
   poste(-4, -10.5); poste(36, -10.5);
@@ -956,7 +962,8 @@ function construirVila() {
   ESPELHO = true; metadeVila('#e9cf73', '#2f5f9f'); ESPELHO = false;
   // centro da rua: ônibus e caminhão (cobertura), carros
   onibus(-15, -3.4, -4, -0.8); caminhao(4, 0.8, 15, 3.4);
-  carro(-27, 5.5, 'x', '#c9c9c9'); carro(27, -5.5, 'x', '#2a2a2a'); carro(-36, 2, 'z', '#8c6a2a'); carro(36, -2, 'z', '#5a7a3a');
+  carro(-27, 5.5, 'x', '#c9c9c9'); carro(27, -5.5, 'x', '#2a2a2a'); carro(-36, 2, 'z', '#8c6a2a'); carro(36, -2, 'z', '#5a7a3a'); carro(-20, -6.5, 'x', '#9a2f2f'); carro(20, 6.5, 'x', '#2f4f9a');
+  caixa(-24, -3, -20, -2.2, 1.0, 'concreto:#bdb6a8'); caixa(20, 2.2, 24, 3, 1.0, 'concreto:#bdb6a8'); caixa(-3, -9.5, 3, -8.7, 1.2, '#4a4a4a'); caixa(-3, 8.7, 3, 9.5, 1.2, '#4a4a4a'); // canteiros e muretas no meio da rua
   caixa(-1.5, 5, 1.5, 6, 0.9, '#c0392b'); caixa(-1.5, -6, 1.5, -5, 0.9, '#c0392b');                     // barreiras
   caixa(-9, 7.5, -6, 8.5, 0.8, 'concreto:#bdb6a8'); caixa(6, -8.5, 9, -7.5, 0.8, 'concreto:#bdb6a8');     // floreiras na calçada
   const placa = new THREE.Mesh(new THREE.PlaneGeometry(6, 1), new THREE.MeshBasicMaterial({ map: textoPlaca('BEM-VINDO À VILA NUCLEAR', '#fff', '#2e7d32') })); colocar(placa, 0, 3.4, -35.5); const pp = bloco(0.12, 3, 0.12, '#666'); colocar(pp, -3.2, 1.5, -35.5); const pp2 = bloco(0.12, 3, 0.12, '#666'); colocar(pp2, 3.2, 1.5, -35.5);
@@ -993,12 +1000,19 @@ function construirMansao() {
   for (const [x, z] of [[-16, -22], [16, -22], [-16, 4], [16, 4]]) { caixa(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 3.2, C2, PAT); }        // pilares
   // ===== SALA DE ESTAR (sul): x -20..20, z 8..28, ao nível do pátio =====
   caixa(-20, 8, 20, 28, PAT, 'concreto:#e9e3d6'); pisoVisual(-19.7, 8.3, 19.7, 27.7, 'piso', PAT + 0.012);
-  paredeX(8, 8.3, -20, 20, PAT, PAT + 4.2, C, [vao(-4, 4, PAT, 3.0), { a: -17, b: -7, base: PAT + 0.4, topo: PAT + 3.4 }, { a: 7, b: 17, base: PAT + 0.4, topo: PAT + 3.4 }]); // frente para o pátio: vidros grandes
-  paredeX(27.7, 28, -20, 20, PAT, PAT + 4.2, C, [por(-14, -11, PAT, 2.6), por(11, 14, PAT, 2.6), jan(-6, 6, PAT, 1.2, 3.2)]);        // fundos: portas para a entrada
-  paredeZ(-20, -19.7, 8.3, 27.7, PAT, PAT + 4.2, C, [por(16, 19, PAT, 2.6), jan(10, 14, PAT, 1.0, 3.0)]);                           // oeste: porta para a quadra
-  paredeZ(19.7, 20, 8.3, 27.7, PAT, PAT + 4.2, C, [por(16, 19, PAT, 2.6), jan(10, 14, PAT, 1.0, 3.0)]);                             // leste: porta para a lavanderia
-  paredeZ(-0.15, 0.15, 14, 22, PAT, PAT + 4.2, V, []);                                                                             // meia-parede divisória
-  caixa(-20, 8, 20, 28, 0.3, C2, PAT + 4.2);
+  const SA = PAT + 3.4, ST = PAT + 6.6; // mezanino a 3,4 m; pé-direito duplo
+  paredeX(8, 8.3, -20, 20, PAT, ST, C, [vao(-4, 4, PAT, 3.0), { a: -17, b: -7, base: PAT + 0.4, topo: PAT + 3.0 }, { a: 7, b: 17, base: PAT + 0.4, topo: PAT + 3.0 }, { a: -16, b: -4, base: SA + 0.9, topo: SA + 2.4 }, { a: 4, b: 16, base: SA + 0.9, topo: SA + 2.4 }]); // frente: vidros embaixo e janelas do mezanino em cima
+  paredeX(27.7, 28, -20, 20, PAT, ST, C, [por(-14, -11, PAT, 2.6), por(11, 14, PAT, 2.6), jan(-6, 6, PAT, 1.2, 3.0), jan(-14, -8, SA, 0.9, 2.3), jan(8, 14, SA, 0.9, 2.3)]);        // fundos: portas para a entrada e janelas do mezanino
+  paredeZ(-20, -19.7, 8.3, 27.7, PAT, ST, C, [por(16, 19, PAT, 2.6), jan(10, 14, PAT, 1.0, 3.0), jan(20, 26, SA, 0.9, 2.3)]);                           // oeste: porta para a quadra
+  paredeZ(19.7, 20, 8.3, 27.7, PAT, ST, C, [por(16, 19, PAT, 2.6), jan(10, 14, PAT, 1.0, 3.0), jan(20, 26, SA, 0.9, 2.3)]);                             // leste: porta para a lavanderia
+  paredeZ(-0.15, 0.15, 14, 22, PAT, PAT + 3.0, V, []);                                                                             // meia-parede divisória
+  caixa(-20, 8, 20, 28, 0.3, C2, ST);
+  // mezanino: laje sobre a metade dos fundos, escada junto à parede leste, guarda-corpo de vidro na frente
+  caixa(-19.7, 18, 17.7, 27.7, 0.3, 'piso', SA - 0.3);
+  rampa(17.7, 8.3, 19.7, 18.3, SA, 'z-', PAT); caixa(17.7, 18, 19.7, 27.7, 0.3, 'piso', SA - 0.3);                              // escada sobe para o fundo
+  caixa(-19.7, 18, 17.6, 18.1, 1.0, '#bfe3ef', SA).material = mat('#bfe3ef', { transparent: true, opacity: 0.35, roughness: 0.2, metalness: 0.3 });
+  caixa(17.5, 8.3, 17.7, 18.3, 2.0, '#dcd6ca', PAT);                                                                          // corrimão da escada
+  sofa(-14, 22, -8, 24, SA, '#4a5a7a'); movel(4, 24, 9, 25.2, 0.9, '#5a5a5e', SA); armario(-19.4, 24, -18.2, 27.4, SA); luzInterna(0, SA + 2.4, 23, 18);
   sofa(-16, 11, -9, 13, PAT, '#8a3a2a'); sofa(9, 11, 16, 13, PAT, '#8a3a2a'); movel(-13, 15, -10, 17, 0.5, '#3a3a3a', PAT); movel(10, 15, 13, 17, 0.5, '#3a3a3a', PAT);
   movel(-19.4, 20, -14, 21.2, 0.95, '#5a5a5e', PAT); armario(-19.4, 22, -18.2, 24, PAT, 2.0); mesaCadeiras(14, 22, PAT); movel(-2, 23, 2, 27.4, 0.8, '#2a2a2a', PAT); // cozinha, geladeira, mesa, balcão
   luzInterna(-10, PAT + 3.6, 18, 18); luzInterna(10, PAT + 3.6, 18, 18);
@@ -1029,7 +1043,7 @@ function construirMansao() {
   paredeZ(Q2 - 0.3, Q2, QZ1 + 0.3, QZ2 - 0.3, 0, QA + 3.0, C, [por(-36, -34, 0, 2.4), jan(-38, -32, QA, 0.9, 2.2)]);         // porta para o corredor da garagem
   rampa(Q1 + 0.3, QZ1 + 0.3, Q1 + 2, QZ1 + 8.3, QA, 'z+'); caixa(Q1 + 2, QZ1 + 0.3, Q2 - 0.3, QZ2 - 0.3, 0.3, 'piso', QA - 0.3); caixa(Q1 + 0.3, QZ1 + 8.3, Q1 + 2, QZ2 - 0.3, 0.3, 'piso', QA - 0.3);
   caixa(Q1 + 2, QZ1 + 2.3, Q1 + 2.12, QZ1 + 8.3, 1.0, '#e8e2d6', QA);
-  cama(-31, -39.7, -28, -36.5, QA); armario(-45.5, -35, -44.3, -30, QA); sofa(-36, -28.5, -30, -27); movel(-44, -39.7, -38, -38.7, 0.9, '#5a5a5e');
+  cama(-31, -39.7, -28, -36.5, QA); armario(-39.8, -35, -38.6, -30, QA); sofa(-36, -28.5, -30, -27); movel(-44, -39.7, -38, -38.7, 0.9, '#5a5a5e');
   caixa(Q1, QZ1, Q2, QZ2, 0.3, C2, QA + 3.0); luzInterna(-35, 2.6, -33, 16); luzInterna(-35, QA + 2.5, -33, 16);
   // ===== QUADRA DE BASQUETE (sudoeste): x -46..-22, z 14..38 =====
   pisoVisual(-44, 16, -24, 36, 'quadra'); faixa(-44, 25.9, -24, 26.1); faixa(-44, 16, -43.8, 36); faixa(-24.2, 16, -24, 36); faixa(-44, 16, -24, 16.2); faixa(-44, 35.8, -24, 36);
@@ -1607,6 +1621,20 @@ function modeloArma(chave, g) {
     P(geoArredondada(0.03, 0.14, 0.05, 0.006), M.esc, 0, -0.12, -0.16, 0.05); P(geoArredondada(0.03, 0.1, 0.045, 0.012), M.pol, 0, -0.06, 0.02, 0.3); guarda(0, -0.045, -0.03, 0.02);
     P(geoCilindroZ(0.006, 0.18, 8), M.esc, 0.02, 0.03, 0.17); P(geoCilindroZ(0.006, 0.18, 8), M.esc, -0.02, 0.03, 0.17); P(geoArredondada(0.05, 0.05, 0.02, 0.006), M.pol, 0, 0.02, 0.27);
     res.ponta = -0.32; res.maoE.set(0, -0.06, -0.18);
+  } else if (a.tipo === 'sniper') {
+    const awm = chave === 'awm', bar = chave === 'barrett', comp = bar ? 0.5 : awm ? 0.44 : 0.36;
+    P(geoArredondada(0.05, 0.075, 0.34, 0.012), bar ? M.esc : M.med, 0, 0.02, -0.06);                       // receptor
+    P(geoArredondada(bar ? 0.06 : 0.05, 0.06, 0.24, 0.012), bar ? M.esc : (awm ? M.oliva : M.mad), 0, 0.005, -0.34); // guarda-mão / chassi
+    P(geoCilindroZ(bar ? 0.014 : 0.011, comp, 10), M.esc, 0, 0.03, -0.46 - comp / 2);                           // cano longo
+    P(geoCilindroZ(bar ? 0.026 : 0.016, 0.07, 10, bar ? 0.03 : 0.018), M.esc, 0, 0.03, -0.46 - comp - 0.03);      // freio de boca
+    for (const sx of [-1, 1]) P(geoCilindroZ(0.005, 0.24, 6), M.esc, sx * 0.035, -0.08, -0.5, 1.1, 0, sx * 0.3);  // bipé
+    P(geoCilindroZ(0.021, 0.26, 14), M.esc, 0, 0.1, -0.06); P(geoCilindroZ(0.027, 0.03, 14), M.esc, 0, 0.1, -0.17); P(geoCilindroZ(0.027, 0.03, 14), M.esc, 0, 0.1, 0.05); // luneta
+    P(new THREE.CircleGeometry(0.02, 14), M.lente, 0, 0.1, -0.186); for (const sz of [-0.11, 0.0]) P(geoCilindroZ(0.006, 0.03, 8), M.esc, 0, 0.07, sz, Math.PI / 2);
+    if (!bar) { const f = P(geoCilindroZ(0.006, 0.06, 8), M.esc, 0.03, 0.015, 0.0); f.rotation.z = -0.9; }         // ferrolho
+    P(geoArredondada(0.03, bar ? 0.13 : 0.08, bar ? 0.06 : 0.05, 0.008), M.esc, 0, -0.09, -0.16, 0.1);            // carregador
+    P(geoArredondada(0.03, 0.1, 0.045, 0.012), M.pol, 0, -0.06, 0.02, 0.3); guarda(0, -0.045, -0.03, 0.02);
+    P(geoArredondada(0.045, 0.08, 0.26, 0.014), awm ? M.oliva : bar ? M.esc : M.mad, 0, -0.01, 0.2, 0.06); P(geoArredondada(0.035, 0.03, 0.14, 0.008), M.pol, 0, 0.05, 0.16); // coronha e apoio de face
+    res.ponta = -0.46 - comp - 0.07; res.maoE.set(0, -0.03, -0.34);
   } else if (chave === 'minigun') {
     P(geoArredondada(0.14, 0.14, 0.26, 0.02), M.esc, 0, 0, -0.02); P(geoArredondada(0.02, 0.02, 0.22, 0.006), M.med, 0, 0.13, -0.05);
     for (const sz of [-0.15, 0.05]) P(geoArredondada(0.02, 0.05, 0.02, 0.005), M.med, 0, 0.095, sz);
@@ -1654,7 +1682,7 @@ const soldados = [];
 let jogador = null;
 const MATS_SOLD = {};
 const modoLivre = () => partida.modo === 'dm' || partida.modo === 'dom'; // modos com renascimento
-const GOSTOS = ['ak47', 'acr', 'type95', 'mp7', 'ak47', 'acr', 'type95', 'mp5', 'vector', 'pp90', 'scorpion', 'ump45', 'minigun', 'bazuca'];
+const GOSTOS = ['ak47', 'acr', 'type95', 'mp7', 'ak47', 'acr', 'type95', 'mp5', 'vector', 'pp90', 'scorpion', 'ump45', 'scout', 'barrett', 'awm', 'minigun', 'bazuca'];
 class Soldado {
   constructor(nome, time, ehJogador = false) {
     this.nome = nome; this.time = time; this.ehJogador = ehJogador;
@@ -2265,7 +2293,7 @@ function limparBomba() {
 // ====================== INTELIGÊNCIA DOS BOTS ======================
 let dificuldade = 1;
 function inimigosDe(s) { return soldados.filter(o => o.time !== s.time && o.vivo); }
-function alcanceEngajar(s) { const t = s.arma.tipo; return t === 'fuzil' ? 46 : t === 'mg' ? 42 : t === 'lancador' ? 48 : t === 'smg' ? 30 : t === 'pistola' ? 25 : 4; }
+function alcanceEngajar(s) { const t = s.arma.tipo; return t === 'sniper' ? 90 : t === 'fuzil' ? 46 : t === 'mg' ? 42 : t === 'lancador' ? 48 : t === 'smg' ? 30 : t === 'pistola' ? 25 : 4; }
 function velBot(s) { const a = s.arma; let v = CFG.velCorrida * 0.95 * (a.peso || 1); if (s.giroMg > 0) v *= 0.6; const p = s.ia && s.ia.perfil; v *= p === 'agressivo' ? 1.05 : p === 'cauteloso' ? 0.85 : 1; return v; }
 // setores do mapa visitados por cada time (grade 8x8): bots preferem áreas há muito tempo sem ninguém
 const VISITAS = { t: new Float32Array(64), ct: new Float32Array(64) };
@@ -2394,7 +2422,7 @@ function atualizarBot(s, dt) {
       if (s.hp < 30 && dist < 8 && armaAgora.tipo !== 'faca') mv.addScaledVector(frenteH, -2);
     }
     moverBot(s, mv, dt);
-    s.agachado = (dist > 25 && Math.random() < 0.02) ? true : (dist > 25 ? s.agachado : false);
+    s.agachado = armaAgora.tipo === 'sniper' ? dist > 12 : (dist > 25 && Math.random() < 0.02) ? true : (dist > 25 ? s.agachado : false);
     s.alturaAtual = s.agachado ? CFG.alturaAgachado : CFG.altura;
     return;
   }
@@ -2551,7 +2579,8 @@ function botComprar(s) {
       const d = s.dinheiro, r = Math.random();
       if (d >= 6000 + 650 && r < 0.1 && !temNoTime('minigun')) compra('minigun');
       else if (d >= 4500 + 650 && r < 0.18 && !temNoTime('bazuca')) compra('bazuca');
-      else if (d >= 3100 + 650) compra(s.ia.gosto === 'mp7' ? 'mp7' : s.ia.gosto === 'minigun' || s.ia.gosto === 'bazuca' ? 'acr' : s.ia.gosto);
+      else if (d >= 4200 + 650 && r < 0.2) compra(['awm', 'barrett', 'scout'][Math.floor(Math.random() * 3)]);
+      else if (d >= 3100 + 650) compra(s.ia.gosto === 'mp7' ? 'mp7' : s.ia.gosto === 'minigun' || s.ia.gosto === 'bazuca' ? 'acr' : ARMAS[s.ia.gosto].preco <= 3100 ? s.ia.gosto : 'acr');
       else if (d >= 2700 + 650) compra(Math.random() < 0.5 ? 'ak47' : 'type95');
       else if (d >= 2700 && Math.random() < 0.5) compra('ak47');
       else if (d >= 1500 + 300) { const smgs = ['mp7', 'mp5', 'scorpion', 'ump45', 'pp90', 'vector'].filter(k => ARMAS[k].preco + 300 <= d); compra(smgs[Math.floor(Math.random() * smgs.length)]); }
@@ -3382,7 +3411,7 @@ function abrirCompra(forcar) {
   if (!podeComprar()) { subaviso('Só é possível comprar no início da rodada, na sua base'); return; }
   compraAberta = true; $('compra').hidden = false; if (document.pointerLockElement) document.exitPointerLock();
   const lista = $('compraLista'); let html = '';
-  const grupos = { pistola: 'Pistolas', smg: 'Submetralhadoras', fuzil: 'Fuzis', mg: 'Minigun', lancador: 'Bazuca' };
+  const grupos = { pistola: 'Pistolas', smg: 'Submetralhadoras', fuzil: 'Fuzis', sniper: 'Snipers (botão direito = luneta)', mg: 'Minigun', lancador: 'Bazuca' };
   for (const [tipo, titulo] of Object.entries(grupos)) {
     html += `<div><h3>${titulo}</h3>`;
     for (const [k, a] of Object.entries(ARMAS)) if (a.tipo === tipo) html += `<div class="item ${jogador.dinheiro < a.preco ? 'caro' : ''} ${jogador.armas[a.slot] === k ? 'tem' : ''}" data-arma="${k}"><span>${a.nome}<br><small>${a.tipo === 'lancador' ? 'explosão em área · ' + a.pente + '+' + a.reserva + ' foguetes' : 'dano ' + a.dano + ' · ' + a.cadencia + '/s · pente ' + a.pente + (a.rajada ? ' · rajada de ' + a.rajada : '') + (a.giro ? ' · gira antes de atirar' : '')}</small></span><span class="p">$${a.preco}</span></div>`;
