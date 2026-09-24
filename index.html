@@ -1926,7 +1926,8 @@ class Soldado {
     // nasce olhando para a base inimiga
     const inimigo = SPAWN[this.time === 't' ? 'ct' : 't']; const dx = (inimigo.x1 + inimigo.x2) / 2 - pos.x, dz = (inimigo.z1 + inimigo.z2) / 2 - pos.z;
     this.yaw = Math.atan2(-dx, -dz); this.pitch = 0; this.hipYaw = 0;
-    if (modoLivre()) this.protegidoAte = tempo + CFG.protecaoSpawn;
+    this.tempoRenasceu = tempo;
+    if (modoLivre()) this.protegidoAte = tempo + 3;
   }
 }
 function panPara(pos) {
@@ -1979,13 +1980,19 @@ function criarArmaNoChao(chave, pos, mun) {
   armasChao.push({ id: ++ID_OBJ, chave, pos: m.position.clone(), mun: { pente: mun ? mun.pente : ARMAS[chave].pente, reserva: mun ? mun.reserva : ARMAS[chave].reserva }, mesh: m, criado: tempo });
 }
 function limparArmasChao() { for (const a of armasChao) scene.remove(a.mesh); armasChao.length = 0; }
+function armaChaoPerto(pos) {
+  let melhor = null, md = 1.4;
+  if (REDE.modo === 'cliente') { for (const m of REDE.armasChao.values()) { const d = pos.distanceTo(m.position); if (d < md) { md = d; melhor = { chave: m.userData.chave }; } } }
+  else for (const a of armasChao) { const d = pos.distanceTo(a.pos); if (d < md) { md = d; melhor = a; } }
+  return melhor;
+}
 function pegarArmasChao() {
   for (let i = armasChao.length - 1; i >= 0; i--) {
     const a = armasChao[i];
     for (const s of soldados) {
       if (!s.vivo || tempo - a.criado < 0.8) continue;
-      if (s.armas[1]) { if (!s.ia || ARMAS[a.chave].preco <= ARMAS[s.armas[1]].preco * 1.3) continue; if (s.pos.distanceTo(a.pos) < 1.0) { s.largarPrimaria(); } else continue; }
-      if (s.pos.distanceTo(a.pos) < 1.0) { s.darArma(a.chave); s.municao[a.chave] = { pente: a.mun.pente, reserva: a.mun.reserva }; scene.remove(a.mesh); armasChao.splice(i, 1); if (s.ehJogador) subaviso('Pegou ' + ARMAS[a.chave].nome); if (s.remoto && s.conn) { s.ignorarArmasAte = tempo + 0.8; try { s.conn.send({ t: 'ev', ev: [{ t: 'darArma', k: a.chave, mun: a.mun }] }); } catch (e) {} } break; }
+      if (s.armas[1]) { const perto = s.pos.distanceTo(a.pos) < 1.4; if (s.ia) { if (ARMAS[a.chave].preco <= ARMAS[s.armas[1]].preco * 1.3 || !perto) continue; s.largarPrimaria(); } else if (perto && s.acaoE && s.armas[1] !== a.chave) { s.largarPrimaria(); } else continue; }
+      if (s.pos.distanceTo(a.pos) < 1.4) { s.darArma(a.chave); s.municao[a.chave] = { pente: a.mun.pente, reserva: a.mun.reserva }; scene.remove(a.mesh); armasChao.splice(i, 1); if (s.ehJogador) subaviso('Pegou ' + ARMAS[a.chave].nome); if (s.remoto && s.conn) { s.ignorarArmasAte = tempo + 0.8; try { s.conn.send({ t: 'ev', ev: [{ t: 'darArma', k: a.chave, mun: a.mun }] }); } catch (e) {} } break; }
     }
   }
 }
@@ -2460,8 +2467,9 @@ function botComprar(s) {
   const compra = k => { s.dinheiro -= ARMAS[k].preco; s.darArma(k); };
   const primaria = s.armas[1] ? ARMAS[s.armas[1]] : null;
   const temNoTime = k => soldados.some(o => o !== s && o.time === s.time && o.armas[1] === k);
-  if (!primaria || primaria.preco < 1500 || livre) {
-    if (livre) { let k = s.ia.gosto; if ((k === 'minigun' || k === 'bazuca') && temNoTime(k)) k = ['ak47', 'acr', 'type95'][Math.floor(Math.random() * 3)]; if (s.armas[1] !== k) compra(k); }
+  if (!primaria || primaria.preco < 1500 || (livre && !primaria)) {
+    const g = s.ia.gosto, pg = ARMAS[g] ? ARMAS[g].preco : 9999;
+    if (livre && s.dinheiro >= pg + 300 && !((g === 'minigun' || g === 'bazuca') && temNoTime(g))) compra(g);
     else {
       const d = s.dinheiro, r = Math.random();
       if (d >= 6000 + 650 && r < 0.1 && !temNoTime('minigun')) compra('minigun');
@@ -2772,6 +2780,10 @@ function atualizarJogador(dt) {
   if (querAtirar && (j.arma.auto || !j.travaTiro)) { if (j.atirar()) j.travaTiro = !j.arma.auto; else if (j.arma.giro) j.querGiro = tempo; }
   if (!querAtirar) j.travaTiro = false;
   if (j.protegidoAte > tempo && (querAtirar)) j.protegidoAte = 0;
+  if (compraAberta && modoLivre() && tempo - (j.tempoRenasceu || -99) < 12 && REDE.modo !== 'cliente') j.protegidoAte = Math.max(j.protegidoAte, tempo + 3); // invencível enquanto compra ao renascer (+3 s)
+  j.acaoE = !!teclas.KeyE;
+  // arma no chão: dica para trocar segurando E
+  const perto = armaChaoPerto(j.pos); if (perto && j.armas[1] && j.armas[1] !== perto.chave) { subaviso('Segure E para trocar ' + ARMAS[j.armas[1]].nome + ' por ' + ARMAS[perto.chave].nome); if (teclas.KeyE && REDE.modo === 'cliente' && tempo - (j.ultimaTroca || -9) > 1) { j.ultimaTroca = tempo; j.largarPrimaria(); } }
   // bomba: E (no modo online o host calcula o progresso; aqui só a dica)
   if (REDE.modo === 'cliente') { if (partida.modo === 'bomba' && partida.estado === 'live') { if (j.temBomba && siteEm(j.pos) && bomba.estado === 'nenhuma') subaviso('Segure E para plantar a bomba'); else if (j.time === 'ct' && bomba.estado === 'plantada' && bomba.pos && j.pos.distanceTo(bomba.pos) < 1.8) subaviso('Segure E para desarmar'); } return; }
   if (partida.modo === 'bomba' && partida.estado === 'live') {
@@ -2933,7 +2945,7 @@ function novaPartida(modo, time) {
   construirArmaVisual();
   if (modoLivre()) {
     partida.estado = 'live'; partida.inicioLive = tempo; partida.tickDom = 0;
-    for (const s of soldados) { s.dinheiro = 16000; s.vivo = false; }
+    for (const s of soldados) { s.dinheiro = CFG.dinheiroInicial; s.vivo = false; }
     for (const s of soldados) { s.reviver(escolherSpawn(s)); if (s.ia) botComprar(s); }
     jogador.protegidoAte = tempo + 6; abrirCompra(true);
     const zb = SPAWN[time]; subaviso('Lados sorteados: seu time começa pelo ' + ((zb.z1 + zb.z2) / 2 < 0 ? 'norte' : 'sul') + ' do mapa', true);
@@ -2983,7 +2995,7 @@ function atualizarBandeiras(dt) {
       if (b.dono && (b.dono === 't' ? b.prog <= 0 : b.prog >= 0)) { b.dono = null; aviso('Bandeira ' + b.nome + ' neutralizada', '#ffd77a'); somTom(500, 0.15, 0.15, 'triangle'); }
       if (!b.dono && Math.abs(b.prog) >= 1) {
         b.dono = b.prog > 0 ? 't' : 'ct';
-        for (const s of soldados) if (s.vivo && s.time === b.dono && Math.hypot(s.pos.x - b.x, s.pos.z - b.z) < CFG.domRaio) { s.objetivos++; s.objetivoRodada = true; }
+        for (const s of soldados) if (s.vivo && s.time === b.dono && Math.hypot(s.pos.x - b.x, s.pos.z - b.z) < CFG.domRaio) { s.objetivos++; s.objetivoRodada = true; s.dinheiro = Math.min(CFG.dinheiroMax, s.dinheiro + 500); if (s.ehJogador) subaviso('+$500 pela captura de ' + b.nome); }
         const nossa = b.dono === jogador.time;
         aviso('Bandeira ' + b.nome + ' capturada ' + (b.dono === 'ct' ? 'pelos CT' : 'pelos T'), corTime(b.dono)); locutor(nossa ? 'We captured ' + b.nome : 'Enemy captured ' + b.nome);
         somTom(nossa ? 880 : 300, 0.25, 0.2, 'sine');
@@ -3056,9 +3068,12 @@ function atualizarPartida(dt) {
     partida.tempoDM -= dt;
     for (const s of soldados) if (!s.vivo && tempo >= s.respawnEm) {
       s.reviver(escolherSpawn(s));
-      if (s.ia) { s.dinheiro = 16000; botComprar(s); }
-      else { s.dinheiro = 16000; if (jogador.ultimaCompra) recomprar(true); else abrirCompra(true); subaviso('Você renasceu · proteção por ' + CFG.protecaoSpawn + 's · B para trocar de arma'); }
+      if (s.ia) botComprar(s);
+      else { abrirCompra(true); subaviso('Você renasceu · protegido enquanto compra (+3 s) · B abre a loja'); }
     }
+    // renda: a cada 15 s todos ganham $100, mais $50 por bandeira do time (dominação)
+    partida.renda = (partida.renda || 0) + dt;
+    if (partida.renda >= 15) { partida.renda -= 15; const nb = { t: 0, ct: 0 }; for (const b of BANDEIRAS) if (b.dono) nb[b.dono]++; for (const s of soldados) s.dinheiro = Math.min(CFG.dinheiroMax, s.dinheiro + 100 + (partida.modo === 'dom' ? 50 * nb[s.time] : 0)); }
     if (partida.modo === 'dom') {
       atualizarBandeiras(dt);
       const v = partida.pts.ct >= CFG.domPontos ? 'ct' : partida.pts.t >= CFG.domPontos ? 't' : partida.tempoDM <= 0 ? (partida.pts.ct === partida.pts.t ? 'empate' : partida.pts.ct > partida.pts.t ? 'ct' : 't') : null;
@@ -3280,7 +3295,7 @@ function atualizarPlacar() {
 // compra
 let compraAberta = false;
 function podeComprar() {
-  if (modoLivre()) return true;
+  if (modoLivre()) return tempo - (jogador.tempoRenasceu || -99) < 15 || dentroZona(jogador.pos, SPAWN[jogador.time]);
   if (REDE.modo === 'cliente') return partida.estado === 'freeze' || (partida.estado === 'live' && (partida.compraRest || 0) > 0 && dentroZona(jogador.pos, SPAWN[jogador.time]));
   if (partida.estado === 'freeze') return true;
   return partida.estado === 'live' && tempo - partida.inicioLive < CFG.tempoCompra && dentroZona(jogador.pos, SPAWN[jogador.time]);
@@ -3591,7 +3606,7 @@ function receberDoCliente(conn, d) {
   if (!info || !info.soldado) return;
   const r = info.soldado;
   if (d.t === 'in') {
-    if (r.vivo) { r.pos.set(d.x, d.y, d.z); r.vel.set(d.vx, 0, d.vz); r.yaw = d.yw; r.pitch = d.pt; r.agachado = !!d.ag; r.alturaAtual = r.agachado ? CFG.alturaAgachado : CFG.altura; r.acaoE = !!d.e; r.zoom = !!d.zo; }
+    if (r.vivo) { r.pos.set(d.x, d.y, d.z); r.vel.set(d.vx, 0, d.vz); r.yaw = d.yw; r.pitch = d.pt; r.agachado = !!d.ag; r.alturaAtual = r.agachado ? CFG.alturaAgachado : CFG.altura; r.acaoE = !!d.e; r.zoom = !!d.zo; if (d.co && modoLivre() && tempo - (r.tempoRenasceu || -99) < 12) r.protegidoAte = Math.max(r.protegidoAte, tempo + 3); }
     if (!(r.ignorarArmasAte > tempo)) { r.armas[1] = d.a1 && ARMAS[d.a1] ? d.a1 : null; r.armas[2] = d.a2 && ARMAS[d.a2] ? d.a2 : null; r.atual = r.armas[d.at] ? d.at : (r.armas[2] ? 2 : 3); for (const k in d.mu || {}) if (ARMAS[k]) r.municao[k] = d.mu[k]; }
     r.granadas = d.gr || r.granadas;
   } else if (d.t === 'tiro') {
@@ -3635,7 +3650,7 @@ function adicionarRemoto(reg) {
   const bot = soldados.find(s => s.ia && s.time === reg.time);
   if (bot) { if (bot.mesh) scene.remove(bot.mesh); soldados.splice(soldados.indexOf(bot), 1); }
   const r = new Soldado(reg.nome, reg.time); r.ia = null; r.remoto = true; r.conn = reg.conn; reg.soldado = r; soldados.push(r);
-  if (modoLivre()) { r.dinheiro = 16000; r.reviver(escolherSpawn(r)); }
+  if (modoLivre()) { r.dinheiro = CFG.dinheiroInicial; r.reviver(escolherSpawn(r)); }
   else if (partida.estado === 'freeze') { r.dinheiro = CFG.dinheiroInicial; r.reviver(pontoNaZona(SPAWN[r.time])); }
   else { r.vivo = false; r.tempoMorte = 99; r.dinheiro = CFG.dinheiroInicial; }
   criarRotulos();
@@ -3647,7 +3662,7 @@ function removerCliente(conn) {
   if (r && soldados.includes(r)) {
     if (r.temBomba) { r.temBomba = false; largarBomba(r.pos); }
     if (r.mesh) scene.remove(r.mesh); soldados.splice(soldados.indexOf(r), 1);
-    if (partida.estado !== 'inicio' && partida.estado !== 'encerrada') { const b = new Soldado(nomeLivre(r.time), r.time); b.ia.siteEscolhido = Math.floor(Math.random() * 2); b.ia.habilidade = 1; soldados.push(b); if (modoLivre()) { b.dinheiro = 16000; b.reviver(escolherSpawn(b)); botComprar(b); } else b.vivo = false; criarRotulos(); }
+    if (partida.estado !== 'inicio' && partida.estado !== 'encerrada') { const b = new Soldado(nomeLivre(r.time), r.time); b.ia.siteEscolhido = Math.floor(Math.random() * 2); b.ia.habilidade = 1; soldados.push(b); if (modoLivre()) { b.dinheiro = CFG.dinheiroInicial; b.reviver(escolherSpawn(b)); botComprar(b); } else b.vivo = false; criarRotulos(); }
   }
   statusOnline('Sala ' + REDE.sala + ' · ' + reg.nome + ' saiu.'); subaviso(reg.nome + ' saiu da sala'); atualizarLobby();
 }
@@ -3708,7 +3723,7 @@ function iniciarCliente(d) {
   for (const f of fumacas) scene.remove(f.mesh); fumacas.length = 0; limparBomba(); limparMarcas();
   for (const b of BANDEIRAS) { b.dono = null; b.prog = 0; b.contestada = false; }
   marcacoesModo(d.modo);
-  jogador = new Soldado(d.nome, d.time, true); jogador.nid = d.nid; jogador.vivo = false; jogador.tempoMorte = 99; jogador.dinheiro = modoLivre() ? 16000 : CFG.dinheiroInicial; REDE.meuNid = d.nid; soldados.push(jogador);
+  jogador = new Soldado(d.nome, d.time, true); jogador.nid = d.nid; jogador.vivo = false; jogador.tempoMorte = 99; jogador.dinheiro = CFG.dinheiroInicial; REDE.meuNid = d.nid; soldados.push(jogador);
   construirArmaVisual();
   $('inicio').hidden = true; $('fim').hidden = true; $('touch').hidden = !MOBILE; pausaAberta = false; $('pausa').hidden = true; $('feed').innerHTML = '';
   REDE.estadoAntes = 'inicio'; statusOnline('Conectado à sala ' + d.sala);
@@ -3738,7 +3753,7 @@ function aplicarSnapshot(d) {
       if (e.te !== (j.tele || 0)) { // renasceu / nova rodada: posição vem do host
         j.tele = e.te; j.pos.set(e.x, e.y, e.z); j.yaw = e.yw; j.pitch = 0; j.vel.set(0, 0, 0); j.vivo = true; j.hp = e.hp; j.zoom = false; j.recarregando = 0; j.rajadaRest = 0; j.giroMg = 0; j.hpAntes = e.hp;
         if (!j.armas[2]) j.darArma('p9'); for (const k in j.municao) { const a = ARMAS[k]; j.municao[k].pente = a.pente; j.municao[k].reserva = a.reserva; } j.atual = j.armas[1] ? 1 : 2; j.trocando = 0.3;
-        if (modoLivre()) { j.protegidoAte = tempo + CFG.protecaoSpawn; subaviso('Você renasceu · proteção por ' + CFG.protecaoSpawn + 's · B para trocar de arma'); if (!j.ultimaCompra) abrirCompra(true); }
+        j.tempoRenasceu = tempo; if (modoLivre()) { j.protegidoAte = tempo + 3; subaviso('Você renasceu · protegido enquanto compra (+3 s) · B abre a loja'); abrirCompra(true); }
       }
       if (e.pr > 0 && partida.modo === 'bomba') barra(j.time === 't' ? 'Plantando a bomba…' : 'Desarmando' + (j.kit ? ' (kit)' : '') + '…', e.pr / (j.time === 't' ? CFG.tempoPlantar : j.kit ? CFG.tempoDesarmeKit : CFG.tempoDesarme)); else if (partida.modo === 'bomba') barra(null);
     } else {
@@ -3753,7 +3768,7 @@ function aplicarSnapshot(d) {
   // objetos do mundo
   sincronizarLista(REDE.granadas, d.g, g => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), mat(g.tp === 'he' ? '#3a4a3a' : g.tp === 'fumaca' ? '#6a7a6a' : '#cfd8e0')); scene.add(m); return m; }, (m, g) => m.position.set(g.x, g.y + 0.09, g.z));
   sincronizarLista(REDE.foguetes, d.f, f => { const g = new THREE.Group(); const M = matsArma(); g.add(new THREE.Mesh(geoCilindroZ(0.045, 0.22, 10), M.oliva)); const p = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 12), M.laranja); p.rotation.x = -Math.PI / 2; p.position.z = -0.19; g.add(p); g.add(new THREE.PointLight(0xffa040, 1.2, 8, 2)); scene.add(g); return g; }, (g, f) => { g.position.set(f.x, f.y, f.z); const dir = new THREE.Vector3(f.dx, f.dy, f.dz); if (dir.lengthSq() > 0) { g.lookAt(g.position.clone().add(dir)); g.rotateY(Math.PI); } if (!texRastro) texRastro = spriteSuave('rgba(200,200,200,A)', 0.4); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: texRastro, transparent: true, opacity: 0.35, depthWrite: false })); sp.position.copy(g.position); sp.scale.setScalar(0.35); scene.add(sp); efeitos.push({ obj: sp, vel: new THREE.Vector3(0, 0.5, 0), vida: 0.9, cresce2: true }); });
-  sincronizarLista(REDE.armasChao, d.a, a => { const m = new THREE.Group(); modeloArma(a.c, m); m.rotation.set(0, Math.random() * Math.PI, Math.PI / 2 + 0.2); scene.add(m); return m; }, (m, a) => m.position.set(a.x, a.y + 0.09, a.z));
+  sincronizarLista(REDE.armasChao, d.a, a => { const m = new THREE.Group(); modeloArma(a.c, m); m.userData.chave = a.c; m.rotation.set(0, Math.random() * Math.PI, Math.PI / 2 + 0.2); scene.add(m); return m; }, (m, a) => m.position.set(a.x, a.y + 0.09, a.z));
   // bomba
   const b = d.b;
   if (b.e === 'plantada') { if (!bomba.mesh) { bomba.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.3), mat('#1e1e1e', { emissive: corLinear('#ff2020'), emissiveIntensity: 0.8 })); scene.add(bomba.mesh); } bomba.pos = new THREE.Vector3(b.x, 0, b.z); bomba.mesh.position.set(b.x, 0.1, b.z); $('bombaIcone').hidden = false; }
@@ -3804,7 +3819,7 @@ function replicarEvento(ev) {
 function enviarInput() {
   const j = jogador; if (!REDE.conn || !j) return;
   const mu = {}; for (const k of [j.armas[1], j.armas[2]]) if (k && j.municao[k]) mu[k] = j.municao[k];
-  try { REDE.conn.send({ t: 'in', x: r2(j.pos.x), y: r2(j.pos.y), z: r2(j.pos.z), vx: r2(j.vel.x), vz: r2(j.vel.z), yw: r2(j.yaw), pt: r2(j.pitch), ag: j.agachado ? 1 : 0, e: teclas.KeyE ? 1 : 0, zo: j.zoom ? 1 : 0, a1: j.armas[1], a2: j.armas[2], at: j.atual, mu, gr: j.granadas }); } catch (e) {}
+  try { REDE.conn.send({ t: 'in', x: r2(j.pos.x), y: r2(j.pos.y), z: r2(j.pos.z), vx: r2(j.vel.x), vz: r2(j.vel.z), yw: r2(j.yaw), pt: r2(j.pitch), ag: j.agachado ? 1 : 0, e: teclas.KeyE ? 1 : 0, co: compraAberta ? 1 : 0, zo: j.zoom ? 1 : 0, a1: j.armas[1], a2: j.armas[2], at: j.atual, mu, gr: j.granadas }); } catch (e) {}
 }
 function loopCliente(dt) {
   tempo += dt; lerControle(dt);
