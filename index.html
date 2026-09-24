@@ -31,6 +31,19 @@
   #bandeiras .band.ct { border-color:var(--ct); background:var(--ct); color:#0a1a2a; } #bandeiras .band.t { border-color:var(--t); background:var(--t); color:#2a1a00; }
   #bandeiras .band.cont { animation:pisca .6s infinite; }
   .item.tem { border-color:#9dff5a; }
+  #serie { right:16px; bottom:190px; display:flex; gap:10px; align-items:center; border:1px solid rgba(255,215,122,.35); }
+  #serie .n { font-size:34px; font-weight:800; color:#ffd77a; min-width:40px; text-align:center; line-height:1; }
+  #serie .t { font-size:11px; letter-spacing:1px; color:var(--hud2); font-weight:700; }
+  #serie .t small { letter-spacing:0; font-weight:400; font-size:11px; color:var(--hud); }
+  #serie.quente { border-color:#ff8a3c; box-shadow:0 0 12px rgba(255,138,60,.35); }
+  #serie.pulso { animation:pulso .5s; }
+  @keyframes pulso { 0% { transform:scale(1); } 40% { transform:scale(1.18); } 100% { transform:scale(1); } }
+  #apoios { left:16px; top:190px; display:flex; flex-direction:column; gap:3px; font-size:12px; font-weight:700; }
+  #apoios div { background:rgba(0,0,0,.5); padding:3px 8px; border-radius:4px; color:#9dff5a; border-left:3px solid #9dff5a; }
+  #marcas { inset:0; overflow:hidden; }
+  .marca { position:absolute; transform:translate(-50%,-100%); text-align:center; color:#ff4040; font-size:11px; font-weight:700; text-shadow:0 1px 3px #000; }
+  .marca i { display:block; margin:0 auto; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-top:11px solid #ff4040; filter:drop-shadow(0 0 3px #000); }
+  body.mobile #serie { bottom:150px; right:200px; } body.mobile #apoios { top:130px; }
   @keyframes pisca { 50% { opacity:.3; } }
   #aviso { left:50%; top:60px; transform:translateX(-50%); font-size:22px; font-weight:700; text-shadow:0 2px 6px #000; text-align:center; text-wrap:balance; max-width:80vw; }
   #subaviso { left:50%; top:96px; transform:translateX(-50%); font-size:14px; color:var(--hud2); text-shadow:0 1px 4px #000; text-align:center; }
@@ -151,7 +164,9 @@
 <div id="slots" class="hud"></div>
 <div id="barra" class="hud" hidden><div id="barraFill"></div></div>
 <div id="barraTxt" class="hud" hidden></div>
-<div id="serie" class="hud" style="left:50%;bottom:64px;transform:translateX(-50%);font-size:13px;color:#ffd77a;text-shadow:0 1px 4px #000"></div>
+<div id="serie" class="hud painel"></div>
+<div id="apoios" class="hud"></div>
+<div id="marcas" class="hud"></div>
 
 <div id="compra" class="menu" hidden>
   <h2>Comprar equipamento · <span id="compraGrana"></span> · <small>tecla <kbd>B</kbd> fecha</small> <button id="btnRecompra" style="float:right;font-size:12px;padding:4px 10px">↻ Comprar igual à rodada anterior</button></h2>
@@ -1408,15 +1423,18 @@ const somHit = (cabeca) => somTom(cabeca ? 2200 : 1400, cabeca ? 0.09 : 0.05, 0.
 const somClique = () => somTom(900, 0.03, 0.12, 'square');
 const somPasso = (vol = 0.08, pan = 0) => { if (!audio) return; const t = audio.currentTime, s = audio.createBufferSource(); s.buffer = ruido(0.04); const g = audio.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.04); const lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; s.connect(lp); lp.connect(g); const p = audio.createStereoPanner ? audio.createStereoPanner() : null; if (p) { p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); p.connect(audio.destination); } else g.connect(audio.destination); s.start(t); };
 // grunhido de dor de quem leva tiro (mais forte no fogo amigo)
-function somDor(pos, forte = false) {
+function somDor(pos, forte = false) { // "AI!"/"OUCH": voz sintética (vogal A→U com formantes) e um "tch" no fim
   if (!audio || !jogador) return; const d = pos.distanceTo(jogador.olho); if (d > 35) return;
-  const v = (forte ? 0.55 : 0.28) * Math.max(0.15, 1 - d / 35), t = audio.currentTime;
-  const o = audio.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(forte ? 175 : 215, t); o.frequency.exponentialRampToValueAtTime(65, t + 0.3);
-  const g = audio.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
-  const lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(300, t + 0.3);
-  const p = audio.createStereoPanner ? audio.createStereoPanner() : null;
-  o.connect(lp); lp.connect(g); if (p) { p.pan.value = Math.max(-1, Math.min(1, panPara(pos))); g.connect(p); p.connect(audio.destination); } else g.connect(audio.destination);
-  o.start(t); o.stop(t + 0.34);
+  const v = (forte ? 0.9 : 0.4) * Math.max(0.15, 1 - d / 35), t = audio.currentTime, dur = forte ? 0.5 : 0.38;
+  const saida = audio.createGain(); saida.gain.setValueAtTime(0.0001, t); saida.gain.exponentialRampToValueAtTime(v, t + 0.03); saida.gain.setValueAtTime(v, t + dur * 0.45); saida.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  const p = audio.createStereoPanner ? audio.createStereoPanner() : null; if (p) { p.pan.value = Math.max(-1, Math.min(1, panPara(pos))); saida.connect(p); p.connect(audio.destination); } else saida.connect(audio.destination);
+  const f0 = forte ? 190 : 150;
+  for (const [f1a, f1b, f2a, f2b, ganho] of [[780, 380, 1250, 850, 1], [780, 380, 1250, 850, 0]]) { // duas cópias levemente desafinadas dão corpo
+    const o = audio.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f0 * (ganho ? 1 : 1.01), t); o.frequency.exponentialRampToValueAtTime(f0 * 0.62, t + dur);
+    for (const [fa, fb, q] of [[f1a, f1b, 7], [f2a, f2b, 9]]) { const bp = audio.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(fa, t); bp.frequency.exponentialRampToValueAtTime(fb, t + dur * 0.8); const g = audio.createGain(); g.gain.value = 0.9; o.connect(bp); bp.connect(g); g.connect(saida); }
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const ch = audio.createBufferSource(); ch.buffer = ruido(0.07); const hp = audio.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500; const gch = audio.createGain(); gch.gain.setValueAtTime(v * 0.5, t + dur * 0.75); gch.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.75 + 0.07); ch.connect(hp); hp.connect(gch); gch.connect(saida); ch.start(t + dur * 0.75);
 }
 function locutor(texto) {
   evento({ t: 'loc', txt: texto });
@@ -1887,9 +1905,14 @@ class Soldado {
       const querendo = tempo - (this.querGiro || -9) < 0.12;
       const antes = this.giroMg || 0;
       this.giroMg = querendo ? Math.min(a.giro, antes + dt) : Math.max(0, antes - dt * 0.8);
-      this.somGiro = (this.somGiro || 0) - dt;
-      if (this.giroMg > 0 && this.somGiro <= 0 && (this.ehJogador || this.pos.distanceTo(jogador.pos) < 30)) { this.somGiro = 0.07; somTom(180 + this.giroMg / a.giro * 520, 0.08, 0.08 * (this.ehJogador ? 1 : 0.5), 'sawtooth'); }
-    } else this.giroMg = 0;
+      if (audio) {
+        const perto = this.ehJogador || this.pos.distanceTo(jogador.pos) < 30;
+        if (this.giroMg > 0 && perto) {
+          if (!this.oscGiro) { const o = audio.createOscillator(), g = audio.createGain(), lp = audio.createBiquadFilter(); o.type = 'triangle'; lp.type = 'lowpass'; lp.frequency.value = 600; g.gain.value = 0; o.connect(lp); lp.connect(g); g.connect(audio.destination); o.start(); this.oscGiro = { o, g }; }
+          const f = this.giroMg / a.giro; this.oscGiro.o.frequency.setTargetAtTime(60 + f * 260, audio.currentTime, 0.05); this.oscGiro.g.gain.setTargetAtTime(0.05 * (this.ehJogador ? 1 : 0.5) * (0.3 + f), audio.currentTime, 0.05);
+        } else if (this.oscGiro) { const og = this.oscGiro; this.oscGiro = null; og.g.gain.setTargetAtTime(0, audio.currentTime, 0.05); setTimeout(() => { try { og.o.stop(); } catch (e) {} }, 300); }
+      }
+    } else { this.giroMg = 0; if (this.oscGiro) { const og = this.oscGiro; this.oscGiro = null; og.g.gain.setTargetAtTime(0, audio.currentTime, 0.05); setTimeout(() => { try { og.o.stop(); } catch (e) {} }, 300); } }
     if (this.rajadaRest > 0 && this.cooldown <= 0 && this.recarregando <= 0 && this.vivo) this.atirar();
   }
   reviver(pos) {
@@ -3169,12 +3192,38 @@ function atualizarHUD() {
     for (const b of BANDEIRAS) { const p = Math.round(Math.abs(b.prog) * 100); html += `<span class="band ${b.dono || ''} ${b.contestada ? 'cont' : ''}" style="--p:${p}%;--c:${b.prog > 0 ? '#e0a640' : '#5fa8ff'}">${b.nome}</span>`; }
     if (bh.innerHTML !== html) bh.innerHTML = html;
   }
+  // contador de série (killstreak) sempre visível
   const sr = j.serie || 0, prox = Object.keys(SERIES).map(Number).find(n => n > sr); const elS = $('serie');
-  const txtS = j.vivo && (sr >= 1 || modoLivre()) ? (sr >= 2 ? '🔥 ' + sr + ' abates seguidos' : sr === 1 ? '1 abate seguido' : '') + (prox ? (sr ? ' · ' : '') + 'próximo apoio em ' + (prox - sr) + ': ' + SERIES[prox].nome : '') : '';
-  if (elS.textContent !== txtS) elS.textContent = txtS;
+  const htmlS = '<div class="n">' + sr + '</div><div class="t">SÉRIE DE ABATES' + (prox ? '<br><small>faltam ' + (prox - sr) + ' para <b>' + SERIES[prox].nome + '</b></small>' : '<br><small>máximo!</small>') + '</div>';
+  if (elS.innerHTML !== htmlS) { elS.innerHTML = htmlS; if (sr > (j.serieAntes || 0)) { elS.classList.remove('pulso'); void elS.offsetWidth; elS.classList.add('pulso'); } j.serieAntes = sr; }
+  elS.classList.toggle('quente', sr >= 2);
+  // apoios ativos (VANT, contra-VANT, juggernaut...)
+  const ap = []; const inim = j.time === 't' ? 'ct' : 't';
+  if (apoio.vant[j.time] > tempo) ap.push('📡 VANT ' + Math.ceil(apoio.vant[j.time] - tempo) + 's' + (apoio.cvant[inim] > tempo ? ' (bloqueado)' : ''));
+  if (apoio.vant[inim] > tempo && !(apoio.cvant[j.time] > tempo)) ap.push('⚠ VANT inimigo ' + Math.ceil(apoio.vant[inim] - tempo) + 's');
+  if (apoio.cvant[j.time] > tempo) ap.push('🛰 Contra-VANT ' + Math.ceil(apoio.cvant[j.time] - tempo) + 's');
+  if (j.jugg) ap.push('🛡 Juggernaut');
+  const nS = (REDE.modo === 'cliente' ? [...REDE.sentinelas.values()] : apoio.sentinelas).filter(x => x.time === j.time).length; if (nS) ap.push('🔫 Sentinela ×' + nS);
+  const nD = (REDE.modo === 'cliente' ? [...REDE.drones.values()] : apoio.drones).filter(x => x.time === j.time).length; if (nD) ap.push('🚁 Drone');
+  const htmlA = ap.map(x => '<div>' + x + '</div>').join(''); const elA = $('apoios'); if (elA.innerHTML !== htmlA) elA.innerHTML = htmlA;
+  marcarInimigosNaTela(vantAtivo(j.time, inim));
   if (j.protegidoAte > tempo && j.vivo) { $('subaviso').textContent = 'Protegido por ' + Math.ceil(j.protegidoAte - tempo) + 's'; subavisoTimer = 0.5; }
   $('mira').style.transform = 'scale(' + (1 + Math.hypot(j.vel.x, j.vel.z) * 0.12 + j.tirosSeguidos * 0.15 + (j.noChao ? 0 : 0.8)) + ')';
   $('mira').style.opacity = j.zoom || !j.vivo ? 0 : 1;
+}
+// VANT: marca os inimigos na tela (mesmo atrás de paredes), com distância
+const _proj = new THREE.Vector3();
+function marcarInimigosNaTela(ativo) {
+  const c = $('marcas'); if (!ativo || !jogador.vivo) { if (c.childElementCount) c.innerHTML = ''; return; }
+  const inimigos = soldados.filter(s => s.vivo && s.time !== jogador.time);
+  while (c.childElementCount < inimigos.length) { const d = document.createElement('div'); d.className = 'marca'; d.innerHTML = '<span></span><i></i>'; c.appendChild(d); }
+  while (c.childElementCount > inimigos.length) c.removeChild(c.lastChild);
+  inimigos.forEach((e, i) => {
+    const el = c.children[i]; _proj.set(e.pos.x, e.pos.y + e.alturaAtual + 0.35, e.pos.z).project(camera);
+    if (_proj.z > 1 || Math.abs(_proj.x) > 1.05 || Math.abs(_proj.y) > 1.05) { el.style.display = 'none'; return; }
+    el.style.display = ''; el.style.left = ((_proj.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - _proj.y) / 2 * innerHeight) + 'px';
+    el.firstChild.textContent = Math.round(e.pos.distanceTo(jogador.pos)) + 'm';
+  });
 }
 function atualizarOverlays(dt) {
   avisoTimer -= dt; subavisoTimer -= dt; danoTimer -= dt; hitTimer -= dt; flashTela = Math.max(0, flashTela - dt);
