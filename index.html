@@ -801,14 +801,14 @@ function manequim(x, z, rot, cor = '#e8dccb') { // boneco de teste nuclear (só 
   for (const sx of [-0.24, 0.24]) { const b = M(new THREE.CylinderGeometry(0.05, 0.045, 0.6, 8), sx, 1.15, 0); b.rotation.z = sx < 0 ? 0.3 : -0.9; }
   colocar(g, x, 0, z, rot);
 }
-function arbusto(x, z, r = 0.9) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat('#3d6b2c', { roughness: 1, flatShading: true })); m.scale.y = 0.7; colocar(m, x, r * 0.5, z); }
-function estatua(x, z) {
-  caixa(x - 0.7, z - 0.7, x + 0.7, z + 0.7, 1.4, 'concreto:#ddd6c8');
+function arbusto(x, z, r = 0.9, y0 = 0) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat('#3d6b2c', { roughness: 1, flatShading: true })); m.scale.y = 0.7; colocar(m, x, y0 + r * 0.5, z); }
+function estatua(x, z, y0 = 0) {
+  caixa(x - 0.7, z - 0.7, x + 0.7, z + 0.7, 1.4, 'concreto:#ddd6c8', y0);
   const g = new THREE.Group(), m = mat('#e6e2da', { roughness: 0.5 });
   const M = (geo, px, py, pz, rz = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); o.rotation.z = rz; g.add(o); };
   M(new THREE.CylinderGeometry(0.2, 0.26, 0.9, 10), 0, 0.45, 0); M(new THREE.CylinderGeometry(0.22, 0.2, 0.7, 10), 0, 1.2, 0); M(new THREE.SphereGeometry(0.16, 12, 10), 0, 1.72, 0);
   M(new THREE.CylinderGeometry(0.06, 0.05, 0.7, 8), -0.3, 1.35, 0, 0.9); M(new THREE.CylinderGeometry(0.06, 0.05, 0.7, 8), 0.28, 1.15, 0, -0.4);
-  colocar(g, x, 1.4, z, Math.random() * 6);
+  colocar(g, x, y0 + 1.4, z, Math.random() * 6);
 }
 function tabelaBasquete(x, z, rot) {
   const g = new THREE.Group(); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.6, 8), mat('#444')); p.position.y = 1.8; g.add(p);
@@ -894,7 +894,7 @@ function metadeVila(corCasa, corCarro) {
   paredeZ(X2 - 0.3, X2, Z1 + 0.3, Z2 - 0.3, A, TOPO, T, [jan(-26, -22, A, 0.9, 2.0)]);
   paredeZ(-20.15, -19.85, Z1 + 0.3, Z2 - 0.3, A, TOPO, BR, [por(-24, -22, A)]);                        // divisória do quarto
   cama(-16, -27.7, -14, -25.5, A); cama(-27, -27.7, -25.2, -25.5, A, '#7a9a8a'); armario(-13.6, -22, -12.4, -19.5, A); movel(-19.7, -18.4, -17.5, -17.6, 0.75, '#7a5a3a', A); // camas, guarda-roupa, escrivaninha
-  caixa(X1, Z1, X2, Z2, 0.25, '#d8d2c6', TOPO); telhado(X1, Z1, X2, Z2, TOPO + 0.25, 2.4, '#5a3a2e', 'x'); chamine(-15, -21, TOPO + 1.4, 1.8);
+  caixa(X1, Z1, X2, Z2, 0.25, '#d8d2c6', TOPO); telhado(X1, Z1, X2, Z2, TOPO + 0.25, 2.4, '#5a3a2e', 'x'); chamine(-15, -25, TOPO + 0.9, 1.8);
   // alpendre da entrada
   caixa(-23.5, -16, -18.5, -13.6, 0.25, 'concreto:#d5cec2'); for (const px of [-23.2, -18.8]) { const p = bloco(0.18, 2.6, 0.18, '#f1eee6'); colocar(p, px, 1.55, -13.9); } const tel = bloco(5.4, 0.16, 2.8, '#5a3a2e'); colocar(tel, -21, 2.95, -14.9);
   luzInterna(-24, 2.5, -19); luzInterna(-16, 2.5, -24); luzInterna(-24, A + 2.3, -22); luzInterna(-16, A + 2.3, -22);
@@ -955,20 +955,22 @@ function construirMansao() {
   colinas('#6f8a4a', 16, 175);
   caixa(-49, -41, 49, -40, 4, C2); caixa(-49, 40, 49, 41, 4, C2); caixa(-49, -41, -48, 41, 4, C2); caixa(48, -41, 49, 41, 4, C2);
   // ===== GARAGEM (norte, base CT): x -16..16, z -40..-26 =====
-  pisoVisual(-16, -40, 16, -26, 'concreto');
-  paredeX(-26.3, -26, -16, 16, 0, 3.8, C, [vao(-12, -4, 0, 3.0), vao(4, 12, 0, 3.0)]);                   // duas portas de garagem abertas para o sul
-  paredeZ(-16, -15.7, -40, -26, 0, 3.8, C, [por(-36, -34, 0, 2.4)]); paredeZ(15.7, 16, -40, -26, 0, 3.8, C, [por(-36, -34, 0, 2.4)]);
-  caixa(-16, -40, 16, -26, 0.3, C2, 3.8);
+  pisoVisual(-16, -40, 16, -27, 'concreto');
+  paredeX(-27.3, -27, -16, 16, 0, 3.8, C, [vao(-12, -4, 0, 3.0), vao(4, 12, 0, 3.0)]);                   // duas portas de garagem abertas para o sul
+  paredeZ(-16, -15.7, -40, -27, 0, 3.8, C, [por(-36, -34, 0, 2.4)]); paredeZ(15.7, 16, -40, -27, 0, 3.8, C, [por(-36, -34, 0, 2.4)]);
+  caixa(-16, -40, 16, -27, 0.3, C2, 3.8);
   carro(-8, -33, 'z', '#1d1d1f'); carro(8, -33, 'z', '#b8b8bc'); armario(-15.4, -39.7, -10, -38.7, 0, 2.0); armario(10, -39.7, 15.4, -38.7, 0, 2.0); pilhaCaixas(-2, -39.5); movel(0.5, -39.6, 3.5, -38.6, 1.0, '#6a6e72');
   luzInterna(-8, 3.2, -33, 16); luzInterna(8, 3.2, -33, 16);
   // ===== PÁTIO CENTRAL elevado (x -18..18, z -24..6, +1.5 m) com estátua e canteiros =====
   caixa(-18, -24, 18, 8, PAT, 'concreto:#e9e3d6');
-  rampa(-10, -26, -6, -24, PAT, 'z-'); rampa(6, -26, 10, -24, PAT, 'z-');                                 // escadas norte (da garagem sobem para o pátio)
-  rampa(-20, -14, -18, -8, PAT, 'x-'); rampa(18, -14, 20, -8, PAT, 'x+');                                 // escadas oeste (piscina) e leste (rotatória)
+  rampa(-10, -27, -6, -24, PAT, 'z-'); rampa(6, -27, 10, -24, PAT, 'z-');                                 // escadas norte (da garagem sobem para o pátio), 3 m
+  rampa(-21, -14, -18, -8, PAT, 'x-'); rampa(18, -14, 21, -8, PAT, 'x+');                                 // escadas oeste (piscina) e leste (rotatória), 3 m
+  for (const [a, b] of [[-10.25, -10], [-6, -5.75], [5.75, 6], [10, 10.25]]) caixa(a, -27, b, -24.2, 2.0, '#dcd6ca');   // corrimãos das escadas norte
+  for (const [a, b] of [[-14.25, -14], [-8, -7.75]]) { caixa(-21.2, a, -18, b, 2.0, '#dcd6ca'); caixa(18, a, 21.2, b, 2.0, '#dcd6ca'); } // corrimãos das escadas laterais
   caixa(-18, -24, -10, -23.7, 1.0, '#dcd6ca', PAT); caixa(-6, -24, 6, -23.7, 1.0, '#dcd6ca', PAT); caixa(10, -24, 18, -23.7, 1.0, '#dcd6ca', PAT); // balaustrada norte (vãos nas escadas)
   caixa(-18, -24, -17.7, -14, 1.0, '#dcd6ca', PAT); caixa(-18, -8, -17.7, 8, 1.0, '#dcd6ca', PAT); caixa(17.7, -24, 18, -14, 1.0, '#dcd6ca', PAT); caixa(17.7, -8, 18, 8, 1.0, '#dcd6ca', PAT); // balaustradas laterais
-  estatua(0, -9); caixa(-3, -12, 3, -6, 0.5, 'concreto:#d8d0c0', PAT);                                    // estátua central sobre base
-  for (const [x, z] of [[-13, -19], [13, -19], [-13, 1], [13, 1]]) { caixa(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.9, C2, PAT); arbusto(x, z + 0, 1.1); }
+  caixa(-3, -12, 3, -6, 0.5, 'concreto:#d8d0c0', PAT); estatua(0, -9, PAT + 0.5);                          // estátua central sobre base
+  for (const [x, z] of [[-13, -19], [13, -19], [-13, 1], [13, 1]]) { caixa(x - 1.5, z - 1.5, x + 1.5, z + 1.5, 0.9, C2, PAT); arbusto(x, z, 1.1, PAT + 0.9); }
   caixa(-10, -6, -6, -5, 1.6, '#3d6b2c', PAT); caixa(6, -12, 10, -11, 1.6, '#3d6b2c', PAT); caixa(-10, -13, -9, -5, 1.6, '#3d6b2c', PAT); caixa(9, -13, 10, -5, 1.6, '#3d6b2c', PAT); // sebes formando corredores
   for (const [x, z] of [[-16, -22], [16, -22], [-16, 4], [16, 4]]) { caixa(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 3.2, C2, PAT); }        // pilares
   // ===== SALA DE ESTAR (sul): x -20..20, z 8..28, ao nível do pátio =====
@@ -1040,7 +1042,7 @@ function construirMansao() {
   for (const x of [26, 27.4, 28.8]) movel(x, LZ1 + 0.5, x + 1.2, LZ1 + 1.4, 1.0, '#e8e8ea'); movel(L1 + 0.5, 28, L1 + 3.5, 29, 0.9, '#5a5a5e'); pilhaCaixas(36, 30); cama(30, LZ2 - 4, 33, LZ2 - 1, LA); armario(L1 + 0.5, LZ1 + 0.5, L1 + 1.7, LZ1 + 3, LA);
   caixa(L1, LZ1, L2, LZ2, 0.3, C2, LA + 3.0); luzInterna(34, 2.6, 25, 16); luzInterna(34, LA + 2.5, 25, 16);
   // ===== corredores laterais e cobertura =====
-  caixa(-23, -26, -19, -25.5, 1.1, C2); caixa(19, -26, 23, -25.5, 1.1, C2);                              // muretas de cobertura nos corredores laterais
+  caixa(-23, -27, -19, -26.5, 1.1, C2); caixa(19, -27, 23, -26.5, 1.1, C2);                              // muretas de cobertura nos corredores laterais
   rampa(-24, 16, -20, 19, PAT, 'x-'); rampa(20, 16, 24, 19, PAT, 'x+');                                   // escadas das portas laterais da sala
   poste(-20, -26); poste(20, -26); poste(-22, 12); poste(22, 12); poste(-32, 12); poste(38, 16);
   arvore(-46, 38, 5, 2.2); arvore(46, 38, 5, 2.2); arvore(-46, -8, 5, 2.2); arvore(46, -12, 5, 2.2); arbusto(-20, -4, 1.2); arbusto(20, -4, 1.2);
@@ -1086,9 +1088,9 @@ const MAPAS = {
     spawn: { ct: { x1: -13, z1: -39.5, x2: 13, z2: -31 }, t: { x1: -12, z1: 31, x2: 12, z2: 39 } },
     bandeiras: [{ nome: 'A', x: 0, z: -30 }, { nome: 'B', x: 0, z: -16 }, { nome: 'C', x: 0, z: 34 }],
     defesa: [[[33, -28], [25, -20], [42, -18]], [[-35, -33], [-30, -28], [-40, -20]]], meio: [[0, -16], [0, -2], [-33, -7], [33, 1], [0, 18], [-34, 26], [34, 25]],
-    zonas: [zona('na garagem', -16, -40, 16, -26), zona('no quarto', -46, -40, -24, -26), zona('na galeria', 20, -40, 46, -16), zona('no corredor oeste', -24, -40, -16, -24), zona('no corredor leste', 16, -40, 20, -16),
+    zonas: [zona('na garagem', -16, -40, 16, -27), zona('no quarto', -46, -40, -24, -26), zona('na galeria', 20, -40, 46, -16), zona('no corredor oeste', -24, -40, -16, -24), zona('no corredor leste', 16, -40, 20, -16),
       zona('na sala de estar', -20, 8, 20, 28), zona('na entrada', -30, 28, 30, 40), zona('no bar', -40, 0, -28, 10), zona('na piscina', -46, -24, -20, 10), zona('na quadra', -46, 14, -22, 38),
-      zona('na lavanderia', 24, 16, 44, 34), zona('na rotatória', 20, -14, 46, 14), zona('no pátio', -18, -24, 18, 8)],
+      zona('na lavanderia', 24, 16, 44, 34), zona('na rotatória', 20, -14, 46, 14), zona('no pátio', -21, -27, 21, 8)],
   },
 };
 // dados do mapa ativo (preenchidos por carregarMapa)
@@ -2133,9 +2135,32 @@ function botLancarGranada(s, tipo, alvoPos, arco = 0.35) {
 
 // ====================== BOMBA ======================
 const bomba = { estado: 'nenhuma', pos: null, mesh: null, timer: 0, beep: 0, plantando: 0, desarmando: 0, quem: null, chao: null };
+// ---- modelo da bomba (C4): tijolos bege, painel com visor, teclado, LED e fios ----
+function modeloBomba(g) {
+  const M = matsArma();
+  const corpo = new THREE.Mesh(geoArredondada(0.44, 0.13, 0.3, 0.02), mat('#4a5238', { roughness: 0.85 })); corpo.position.y = 0.065; g.add(corpo);
+  for (const sx of [-0.15, -0.05, 0.05, 0.15]) { const c4 = new THREE.Mesh(geoArredondada(0.085, 0.07, 0.26, 0.015), mat('#d9cfa4', { roughness: 0.9 })); c4.position.set(sx, 0.16, 0); g.add(c4); }
+  for (const sz of [-0.09, 0.09]) { const cinta = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.03, 0.04), mat('#1e1e1e')); cinta.position.set(0, 0.195, sz); g.add(cinta); }
+  const painel = new THREE.Mesh(geoArredondada(0.22, 0.05, 0.14, 0.01), M.esc); painel.position.set(0, 0.22, 0); g.add(painel);
+  const c = document.createElement('canvas'); c.width = 128; c.height = 48; const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+  const visor = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.05), new THREE.MeshBasicMaterial({ map: tex })); visor.rotation.x = -Math.PI / 2; visor.position.set(-0.02, 0.246, -0.03); g.add(visor);
+  for (let i = 0; i < 9; i++) { const t = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.008, 0.018), mat('#c9c9c9')); t.position.set(-0.05 + (i % 3) * 0.025, 0.248, 0.02 + Math.floor(i / 3) * 0.02); g.add(t); }
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), mat('#ff2020', { emissive: corLinear('#ff2020'), emissiveIntensity: 1 })); led.position.set(0.085, 0.25, -0.04); g.add(led);
+  const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.22, 6), M.med); ant.position.set(0.19, 0.3, -0.1); g.add(ant);
+  [['#d02020', -0.1], ['#2050d0', 0.0], ['#e0c020', 0.1]].forEach(([cor, sx], i) => { const fio = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.005, 6, 14, Math.PI), mat(cor)); fio.position.set(sx, 0.2, 0.1 + i * 0.01); fio.rotation.y = Math.PI / 2 * (i % 2); g.add(fio); });
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.userData.visor = { c, tex, led }; atualizarVisorBomba(g, CFG.tempoBomba);
+  return g;
+}
+function atualizarVisorBomba(g, t) {
+  const v = g && g.userData.visor; if (!v) return; const x = v.c.getContext('2d');
+  x.fillStyle = '#0d1a10'; x.fillRect(0, 0, 128, 48); x.fillStyle = t === null ? '#3a7a3a' : t < 10 ? '#ff4040' : '#5fff7a'; x.font = 'bold 34px monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(t === null ? '--:--' : fmtTempo(t) + (t < 10 && Math.floor(t * 4) % 2 ? '' : ''), 64, 26); v.tex.needsUpdate = true;
+  v.led.material.emissiveIntensity = t === null ? 0.3 : (Math.floor(tempo * (t < 10 ? 8 : 2)) % 2 ? 1.5 : 0.1);
+}
 function largarBomba(pos) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.18, 0.25), mat('#2a2a2a', { emissive: corLinear('#ff2020'), emissiveIntensity: 0.4 }));
-  m.position.set(pos.x, 0.1, pos.z); scene.add(m);
+  const m = modeloBomba(new THREE.Group()); atualizarVisorBomba(m, null);
+  m.position.set(pos.x, pos.y, pos.z); m.rotation.set(0.9, Math.random() * 6, 0.3); scene.add(m);
   bomba.chao = { pos: new THREE.Vector3(pos.x, 0, pos.z), mesh: m, criado: tempo };
   subaviso('A bomba foi derrubada!', true);
 }
@@ -2153,8 +2178,7 @@ function siteEm(pos) { return SITES.find(s => dentroZona(pos, s)) || null; }
 function plantarBomba(s) {
   s.temBomba = false; bomba.estado = 'plantada'; bomba.timer = CFG.tempoBomba; bomba.beep = 0; bomba.quem = s; s.objetivos++; s.objetivoRodada = true;
   bomba.pos = new THREE.Vector3(s.pos.x, 0, s.pos.z);
-  bomba.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.3), mat('#1e1e1e', { emissive: corLinear('#ff2020'), emissiveIntensity: 0.8 }));
-  bomba.mesh.position.set(bomba.pos.x, 0.1, bomba.pos.z); scene.add(bomba.mesh);
+  bomba.mesh = modeloBomba(new THREE.Group()); bomba.mesh.position.set(bomba.pos.x, s.pos.y, bomba.pos.z); bomba.mesh.rotation.y = s.yaw; scene.add(bomba.mesh);
   for (const t of soldados) if (t.time === 't') t.dinheiro = Math.min(CFG.dinheiroMax, t.dinheiro + 800);
   aviso('Bomba plantada no site ' + siteEm(bomba.pos).nome + '!', '#ff5a5a'); locutor('The bomb has been planted');
   document.getElementById('bombaIcone').hidden = false;
@@ -2175,8 +2199,8 @@ function explodirBomba() {
 function atualizarBomba(dt) {
   if (bomba.estado !== 'plantada') return;
   bomba.timer -= dt; bomba.beep -= dt;
-  if (bomba.beep <= 0) { const d = bomba.pos.distanceTo(jogador.pos); somTom(1800, 0.06, Math.max(0.05, 0.35 - d / 120), 'square'); bomba.beep = Math.max(0.12, bomba.timer / CFG.tempoBomba * 1.2); if (bomba.mesh) bomba.mesh.material.emissiveIntensity = 1.5; }
-  if (bomba.mesh) bomba.mesh.material.emissiveIntensity = Math.max(0.5, bomba.mesh.material.emissiveIntensity - dt * 4);
+  if (bomba.beep <= 0) { const d = bomba.pos.distanceTo(jogador.pos); somTom(1800, 0.06, Math.max(0.05, 0.35 - d / 120), 'square'); bomba.beep = Math.max(0.12, bomba.timer / CFG.tempoBomba * 1.2); }
+  bomba.visorCd = (bomba.visorCd || 0) - dt; if (bomba.visorCd <= 0) { bomba.visorCd = 0.2; atualizarVisorBomba(bomba.mesh, bomba.timer); }
   if (bomba.timer <= 0) explodirBomba();
 }
 function limparBomba() {
@@ -3357,14 +3381,16 @@ function comprarEquip(k, silencioso) {
 
 // ====================== LOOP ======================
 let ultimo = performance.now();
+let ultimoRaf = 0;
 function loop(agora) {
   requestAnimationFrame(loop);
+  ultimoRaf = performance.now();
   const dt = Math.max(0, Math.min(0.05, (agora - ultimo) / 1000)); ultimo = agora;
   passo(dt, agora);
   renderer.render(scene, camera);
 }
 // com a aba escondida o navegador para o requestAnimationFrame; no online a simulação continua em passos de 50 ms
-setInterval(() => { if (!document.hidden || !(REDE.modo || window.SIM_OCULTA)) return; const agora = performance.now(); let el = Math.min(1, (agora - ultimo) / 1000); ultimo = agora; while (el > 0) { const d = Math.min(0.05, el); el -= d; passo(d, agora); } }, 200);
+setInterval(() => { const parado = document.hidden || performance.now() - ultimoRaf > 400; if (!parado || !(REDE.modo || window.SIM_OCULTA)) return; const agora = performance.now(); let el = Math.min(1, (agora - ultimo) / 1000); ultimo = agora; while (el > 0) { const d = Math.min(0.05, el); el -= d; passo(d, agora); } }, 200);
 function passo(dt, agora) {
   if (partida.estado === 'inicio' || partida.estado === 'encerrada') { lerControle(dt); return; }
   if (REDE.modo === 'cliente') { loopCliente(dt); if ((agora | 0) % 4 === 0) desenharRadar(); return; }
@@ -3690,7 +3716,7 @@ function enviarSnapshot() {
     g: granadas.map(g => ({ i: g.id, tp: g.tipo, x: r2(g.pos.x), y: r2(g.pos.y), z: r2(g.pos.z) })),
     f: foguetes.map(f => ({ i: f.id, x: r2(f.pos.x), y: r2(f.pos.y), z: r2(f.pos.z), dx: r2(f.vel.x), dy: r2(f.vel.y), dz: r2(f.vel.z) })),
     a: armasChao.map(a => ({ i: a.id, c: a.chave, x: r2(a.pos.x), y: r2(a.pos.y), z: r2(a.pos.z) })),
-    b: { e: bomba.estado, tm: r2(bomba.timer), x: bomba.pos ? r2(bomba.pos.x) : 0, z: bomba.pos ? r2(bomba.pos.z) : 0, ch: bomba.chao ? [r2(bomba.chao.pos.x), r2(bomba.chao.pos.z)] : null },
+    b: { e: bomba.estado, tm: r2(bomba.timer), x: bomba.pos ? r2(bomba.pos.x) : 0, y: bomba.mesh ? r2(bomba.mesh.position.y) : 0, z: bomba.pos ? r2(bomba.pos.z) : 0, ch: bomba.chao ? [r2(bomba.chao.pos.x), r2(bomba.chao.pos.z), r2(bomba.chao.mesh.position.y)] : null },
     fl: BANDEIRAS.map(b => ({ d: b.dono, p: r2(b.prog), c: b.contestada ? 1 : 0 })),
   };
   for (const reg of REDE.conns.values()) {
@@ -3771,10 +3797,10 @@ function aplicarSnapshot(d) {
   sincronizarLista(REDE.armasChao, d.a, a => { const m = new THREE.Group(); modeloArma(a.c, m); m.userData.chave = a.c; m.rotation.set(0, Math.random() * Math.PI, Math.PI / 2 + 0.2); scene.add(m); return m; }, (m, a) => m.position.set(a.x, a.y + 0.09, a.z));
   // bomba
   const b = d.b;
-  if (b.e === 'plantada') { if (!bomba.mesh) { bomba.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.3), mat('#1e1e1e', { emissive: corLinear('#ff2020'), emissiveIntensity: 0.8 })); scene.add(bomba.mesh); } bomba.pos = new THREE.Vector3(b.x, 0, b.z); bomba.mesh.position.set(b.x, 0.1, b.z); $('bombaIcone').hidden = false; }
+  if (b.e === 'plantada') { if (!bomba.mesh) { bomba.mesh = modeloBomba(new THREE.Group()); scene.add(bomba.mesh); } bomba.pos = new THREE.Vector3(b.x, 0, b.z); bomba.mesh.position.set(b.x, b.y || 0, b.z); atualizarVisorBomba(bomba.mesh, b.tm); $('bombaIcone').hidden = false; }
   else if (bomba.mesh) { scene.remove(bomba.mesh); bomba.mesh = null; $('bombaIcone').hidden = true; }
   bomba.estado = b.e; bomba.timer = b.tm;
-  if (b.ch) { if (!bomba.chao) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.18, 0.25), mat('#2a2a2a', { emissive: corLinear('#ff2020'), emissiveIntensity: 0.4 })); scene.add(m); bomba.chao = { mesh: m, pos: new THREE.Vector3(), criado: tempo }; } bomba.chao.pos.set(b.ch[0], 0, b.ch[1]); bomba.chao.mesh.position.set(b.ch[0], 0.1, b.ch[1]); }
+  if (b.ch) { if (!bomba.chao) { const m = modeloBomba(new THREE.Group()); atualizarVisorBomba(m, null); m.rotation.set(0.9, 0, 0.3); scene.add(m); bomba.chao = { mesh: m, pos: new THREE.Vector3(), criado: tempo }; } bomba.chao.pos.set(b.ch[0], 0, b.ch[1]); bomba.chao.mesh.position.set(b.ch[0], b.ch[2] || 0, b.ch[1]); }
   else if (bomba.chao) { scene.remove(bomba.chao.mesh); bomba.chao = null; }
   // apoios (VANT, sentinelas, drones)
   if (d.ap) {
