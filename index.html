@@ -192,6 +192,7 @@
     <button id="btnCriarSala">🌐 Criar sala online</button>
     <label>Código <input id="codSala" maxlength="4" placeholder="ABCD" style="width:64px;text-transform:uppercase"></label>
     <button id="btnEntrarSala">Entrar na sala</button>
+    <label title="Só o host decide. Os dois times sempre ficam do mesmo tamanho: bots completam.">Times <select id="times"><option value="livre">cada um escolhe</option><option value="aleatorio">sorteio equilibrado</option><option value="juntos">amigos juntos vs bots</option></select></label>
   </div>
   <div id="salaInfo" hidden style="margin:4px 0 8px;font-size:13px">Sala <b id="salaCod" style="font-size:20px;letter-spacing:3px;color:#ffd77a"></b> · <input id="salaLink" readonly style="width:260px;font-size:11px"> <button id="btnCopiarLink" style="font-size:12px;padding:4px 10px">Copiar link</button></div>
   <p id="onlineStatus" style="color:#8fe07a;min-height:1em"></p>
@@ -3498,7 +3499,7 @@ function receberDoCliente(conn, d) {
     const time = d.time === 't' ? 't' : 'ct', nome = (d.nome || 'Jogador').slice(0, 12);
     const reg = { conn, nome, time, soldado: null }; REDE.conns.set(conn.peer, reg);
     if (partida.estado !== 'inicio' && partida.estado !== 'encerrada') adicionarRemoto(reg);
-    statusOnline('Sala ' + REDE.sala + ' · ' + (REDE.conns.size + 1) + ' jogador(es): ' + nome + ' entrou.'); subaviso(nome + ' entrou na sala');
+    statusOnline('Sala ' + REDE.sala + ' · ' + (REDE.conns.size + 1) + ' jogador(es): ' + [...REDE.conns.values()].map(r => r.nome + ' (' + r.time.toUpperCase() + ')').join(', ') + '. Times: ' + { livre: 'escolha livre', aleatorio: 'sorteio', juntos: 'todos juntos' }[modoTimes()] + '.'); subaviso(nome + ' entrou na sala');
     return;
   }
   if (!info || !info.soldado) return;
@@ -3525,7 +3526,25 @@ function receberDoCliente(conn, d) {
   } else if (d.t === 'largar') { if (r.vivo && d.chave && ARMAS[d.chave]) criarArmaNoChao(d.chave, r.pos, d.mun); }
   else if (d.t === 'radio') { if (typeof d.txt === 'string') radio(r, d.txt.slice(0, 60)); }
 }
+// modo de times da sala (só o host decide): livre = cada um escolhe; aleatorio = sorteio equilibrado; juntos = todos no time do host
+const modoTimes = () => ($('times') && $('times').value) || 'livre';
+function distribuirTimes(timeHost) {
+  if (REDE.modo !== 'host') return timeHost;
+  const regs = [...REDE.conns.values()], mt = modoTimes();
+  if (mt === 'juntos') for (const r of regs) r.time = timeHost;
+  else if (mt === 'aleatorio') {
+    const todos = [{ host: true }, ...regs].sort(() => Math.random() - 0.5); const primeiro = Math.random() < 0.5 ? 'ct' : 't';
+    todos.forEach((p, i) => { const t = i % 2 === 0 ? primeiro : (primeiro === 'ct' ? 't' : 'ct'); if (p.host) timeHost = t; else p.time = t; });
+  }
+  return timeHost;
+}
+function timeParaNovo(reg) { // time de quem entra com a partida já rodando
+  const mt = modoTimes(); if (mt === 'juntos') return jogador.time;
+  if (mt === 'aleatorio') { const h = { t: 0, ct: 0 }; for (const s of soldados) if (s.ehJogador || s.remoto) h[s.time]++; return h.ct < h.t ? 'ct' : h.t < h.ct ? 't' : (Math.random() < 0.5 ? 'ct' : 't'); }
+  return reg.time;
+}
 function adicionarRemoto(reg) {
+  reg.time = timeParaNovo(reg);
   // troca um bot do time pelo jogador humano
   const bot = soldados.find(s => s.ia && s.time === reg.time);
   if (bot) { if (bot.mesh) scene.remove(bot.mesh); soldados.splice(soldados.indexOf(bot), 1); }
@@ -3736,8 +3755,9 @@ $('btnCopiarLink').onclick = () => { $('salaLink').select(); try { navigator.cli
 
 $('btnJogar').onclick = () => {
   iniciarAudio();
-  const modo = document.querySelector('input[name=modo]:checked').value, time = document.querySelector('input[name=time]:checked').value;
+  const modo = document.querySelector('input[name=modo]:checked').value; let time = document.querySelector('input[name=time]:checked').value;
   dificuldade = parseFloat($('dificuldade').value); sensibilidade = parseFloat($('sens').value); fovBase = parseFloat($('fov').value); $('sens2').value = sensibilidade; $('fov2').value = fovBase;
+  time = distribuirTimes(time);
   carregarMapa(document.querySelector('input[name=mapa]:checked').value);
   $('inicio').hidden = true; $('fim').hidden = true; $('touch').hidden = !MOBILE;
   pausaAberta = false; $('pausa').hidden = true;
