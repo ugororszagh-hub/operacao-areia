@@ -281,6 +281,11 @@ const ARMAS = {
   cinco7:   { nome: 'Cinco-Sete AP',   tipo: 'pistola',  preco: 750,  dano: 28,  cadencia: 7,    pente: 20, reserva: 100, recarga: 2.2, auto: false, spread: 0.010, recuo: 0.018, alcance: 100, slot: 2, perfura: true },
   dupla:    { nome: 'Dupla 9mm',       tipo: 'pistola',  preco: 800,  dano: 27,  cadencia: 9,    pente: 30, reserva: 120, recarga: 3.4, auto: false, spread: 0.016, recuo: 0.02,  alcance: 80,  slot: 2 },
   mp7:      { nome: 'MP7',             tipo: 'smg',      preco: 1600, dano: 24,  cadencia: 15,   pente: 40, reserva: 160, recarga: 2.3, auto: true,  spread: 0.016, recuo: 0.011, alcance: 90,  slot: 1, perfura: true },
+  mp5:      { nome: 'MP5',             tipo: 'smg',      preco: 1500, dano: 26,  cadencia: 13,   pente: 30, reserva: 120, recarga: 2.4, auto: true,  spread: 0.014, recuo: 0.011, alcance: 85,  slot: 1 },
+  scorpion: { nome: 'Scorpion EVO',    tipo: 'smg',      preco: 1800, dano: 24,  cadencia: 17,   pente: 30, reserva: 120, recarga: 2.3, auto: true,  spread: 0.019, recuo: 0.012, alcance: 75,  slot: 1 },
+  ump45:    { nome: 'UMP45',           tipo: 'smg',      preco: 1700, dano: 32,  cadencia: 10,   pente: 25, reserva: 100, recarga: 2.5, auto: true,  spread: 0.015, recuo: 0.014, alcance: 90,  slot: 1 },
+  pp90:     { nome: 'PP90',            tipo: 'smg',      preco: 2000, dano: 22,  cadencia: 15,   pente: 50, reserva: 150, recarga: 2.8, auto: true,  spread: 0.017, recuo: 0.009, alcance: 80,  slot: 1, perfura: true },
+  vector:   { nome: 'Vector',          tipo: 'smg',      preco: 2200, dano: 20,  cadencia: 20,   pente: 25, reserva: 150, recarga: 2.2, auto: true,  spread: 0.02,  recuo: 0.008, alcance: 70,  slot: 1 },
   ak47:     { nome: 'AK-47',           tipo: 'fuzil',    preco: 2700, dano: 38,  cadencia: 10,   pente: 30, reserva: 90,  recarga: 2.6, auto: true,  spread: 0.012, recuo: 0.036, alcance: 150, slot: 1, perfura: true },
   acr:      { nome: 'ACR',             tipo: 'fuzil',    preco: 3100, dano: 33,  cadencia: 11.5, pente: 30, reserva: 90,  recarga: 2.4, auto: true,  spread: 0.008, recuo: 0.022, alcance: 160, slot: 1 },
   type95:   { nome: 'Type 95 (rajada)',tipo: 'fuzil',    preco: 2900, dano: 37,  cadencia: 14,   pente: 30, reserva: 90,  recarga: 2.7, auto: false, spread: 0.007, recuo: 0.02,  alcance: 170, slot: 1, rajada: 3, pausaRajada: 0.24 },
@@ -1554,6 +1559,41 @@ function modeloArma(chave, g) {
     P(geoArredondada(0.025, 0.07, 0.03, 0.006), M.pol, 0, -0.045, -0.14); guarda(0, -0.04, -0.03, 0.016);
     P(geoCilindroZ(0.005, 0.14, 8), M.esc, 0.02, 0.01, 0.12); P(geoCilindroZ(0.005, 0.14, 8), M.esc, -0.02, 0.01, 0.12); P(geoArredondada(0.05, 0.05, 0.015, 0.005), M.pol, 0, 0.0, 0.19);
     res.ponta = -0.26; res.maoE.set(0, -0.06, -0.14);
+  } else if (chave === 'mp5') {
+    P(geoArredondada(0.05, 0.075, 0.3, 0.012), M.med, 0, 0.02, -0.06); P(geoCilindroZ(0.026, 0.14, 12), M.pol, 0, 0.02, -0.3);
+    P(geoCilindroZ(0.009, 0.1, 10), M.esc, 0, 0.025, -0.42); P(new THREE.TorusGeometry(0.02, 0.004, 6, 12), M.esc, 0, 0.055, -0.36, 0, 0, 0); P(geoCilindroZ(0.018, 0.03, 10), M.esc, 0, 0.06, 0.0);
+    P(geoArredondada(0.03, 0.15, 0.055, 0.006), M.esc, 0, -0.09, -0.12, 0.3); P(geoArredondada(0.03, 0.1, 0.045, 0.012), M.pol, 0, -0.06, 0.02, 0.3); guarda(0, -0.045, -0.03, 0.02);
+    P(geoArredondada(0.04, 0.065, 0.22, 0.012), M.pol, 0, -0.01, 0.2); P(geoArredondada(0.045, 0.09, 0.02, 0.006), M.pol, 0, -0.02, 0.31);
+    res.ponta = -0.48; res.maoE.set(0, -0.02, -0.3);
+  } else if (chave === 'scorpion') {
+    P(geoArredondada(0.05, 0.07, 0.32, 0.01), M.pol, 0, 0.02, -0.08); P(geoArredondada(0.03, 0.012, 0.3, 0.003), M.esc, 0, 0.062, -0.08);
+    P(geoArredondada(0.03, 0.03, 0.05, 0.006), M.esc, 0, 0.085, -0.02); P(geoCilindroZ(0.009, 0.08, 10), M.esc, 0, 0.02, -0.28); P(geoCilindroZ(0.012, 0.03, 10), M.esc, 0, 0.02, -0.33);
+    P(geoArredondada(0.03, 0.09, 0.06, 0.006), M.esc, 0, -0.06, -0.14, 0.2); P(geoArredondada(0.03, 0.08, 0.06, 0.006), M.esc, 0, -0.13, -0.12, 0.55);
+    P(geoArredondada(0.03, 0.1, 0.045, 0.012), M.pol, 0, -0.06, 0.02, 0.3); guarda(0, -0.045, -0.03, 0.018);
+    P(geoCilindroZ(0.006, 0.18, 8), M.esc, 0.02, 0.02, 0.17); P(geoCilindroZ(0.006, 0.18, 8), M.esc, -0.02, 0.02, 0.17); P(geoArredondada(0.05, 0.05, 0.02, 0.006), M.pol, 0, 0.01, 0.27);
+    res.ponta = -0.35; res.maoE.set(0, -0.03, -0.2);
+  } else if (chave === 'ump45') {
+    P(geoArredondada(0.055, 0.08, 0.36, 0.012), M.pol, 0, 0.02, -0.08); P(geoArredondada(0.03, 0.012, 0.28, 0.003), M.esc, 0, 0.065, -0.06);
+    P(geoArredondada(0.03, 0.035, 0.05, 0.006), M.esc, 0, 0.09, 0.0); P(new THREE.CircleGeometry(0.01, 10), M.lente, 0, 0.092, -0.026);
+    P(geoCilindroZ(0.01, 0.1, 10), M.esc, 0, 0.025, -0.31); P(geoArredondada(0.03, 0.17, 0.05, 0.006), M.esc, 0, -0.1, -0.12, 0.08);
+    P(geoArredondada(0.03, 0.1, 0.045, 0.012), M.pol, 0, -0.06, 0.02, 0.3); guarda(0, -0.045, -0.03, 0.02);
+    P(geoArredondada(0.035, 0.05, 0.2, 0.01), M.pol, 0, 0.01, 0.2); P(geoArredondada(0.045, 0.1, 0.02, 0.006), M.pol, 0, -0.01, 0.31);
+    res.ponta = -0.37; res.maoE.set(0, -0.03, -0.22);
+  } else if (chave === 'pp90') {
+    P(geoArredondada(0.058, 0.08, 0.42, 0.02), M.pol, 0, 0.0, 0.0);                                             // corpo bullpup
+    P(geoArredondada(0.04, 0.03, 0.26, 0.008), M.med, 0, 0.055, -0.04);                                          // carregador horizontal em cima
+    P(geoArredondada(0.03, 0.012, 0.2, 0.003), M.esc, 0, 0.078, -0.04); P(geoArredondada(0.03, 0.035, 0.05, 0.006), M.esc, 0, 0.1, 0.0);
+    P(geoCilindroZ(0.01, 0.1, 10), M.esc, 0, 0.02, -0.26); P(geoCilindroZ(0.013, 0.03, 10), M.esc, 0, 0.02, -0.32);
+    P(geoArredondada(0.05, 0.05, 0.1, 0.01), M.pol, 0, -0.05, -0.12); P(geoArredondada(0.03, 0.09, 0.045, 0.012), M.pol, 0, -0.06, 0.02, 0.25); guarda(0, -0.04, -0.03, 0.018);
+    res.ponta = -0.34; res.maoE.set(0, -0.06, -0.12);
+  } else if (chave === 'vector') {
+    P(geoArredondada(0.05, 0.07, 0.3, 0.01), M.med, 0, 0.03, -0.06); P(geoArredondada(0.03, 0.012, 0.28, 0.003), M.esc, 0, 0.072, -0.06);
+    P(geoArredondada(0.03, 0.035, 0.05, 0.006), M.esc, 0, 0.098, -0.02); P(new THREE.CircleGeometry(0.01, 10), M.lente, 0, 0.1, -0.046);
+    P(geoArredondada(0.05, 0.06, 0.16, 0.01), M.pol, 0, -0.03, -0.1, 0.35);                                      // receptor inferior inclinado (marca do Vector)
+    P(geoCilindroZ(0.009, 0.08, 10), M.esc, 0, 0.03, -0.25); P(geoCilindroZ(0.012, 0.03, 10), M.esc, 0, 0.03, -0.3);
+    P(geoArredondada(0.03, 0.14, 0.05, 0.006), M.esc, 0, -0.12, -0.16, 0.05); P(geoArredondada(0.03, 0.1, 0.045, 0.012), M.pol, 0, -0.06, 0.02, 0.3); guarda(0, -0.045, -0.03, 0.02);
+    P(geoCilindroZ(0.006, 0.18, 8), M.esc, 0.02, 0.03, 0.17); P(geoCilindroZ(0.006, 0.18, 8), M.esc, -0.02, 0.03, 0.17); P(geoArredondada(0.05, 0.05, 0.02, 0.006), M.pol, 0, 0.02, 0.27);
+    res.ponta = -0.32; res.maoE.set(0, -0.06, -0.18);
   } else if (chave === 'minigun') {
     P(geoArredondada(0.14, 0.14, 0.26, 0.02), M.esc, 0, 0, -0.02); P(geoArredondada(0.02, 0.02, 0.22, 0.006), M.med, 0, 0.13, -0.05);
     for (const sz of [-0.15, 0.05]) P(geoArredondada(0.02, 0.05, 0.02, 0.005), M.med, 0, 0.095, sz);
@@ -1601,7 +1641,7 @@ const soldados = [];
 let jogador = null;
 const MATS_SOLD = {};
 const modoLivre = () => partida.modo === 'dm' || partida.modo === 'dom'; // modos com renascimento
-const GOSTOS = ['ak47', 'acr', 'type95', 'mp7', 'ak47', 'acr', 'type95', 'mp7', 'minigun', 'bazuca'];
+const GOSTOS = ['ak47', 'acr', 'type95', 'mp7', 'ak47', 'acr', 'type95', 'mp5', 'vector', 'pp90', 'scorpion', 'ump45', 'minigun', 'bazuca'];
 class Soldado {
   constructor(nome, time, ehJogador = false) {
     this.nome = nome; this.time = time; this.ehJogador = ehJogador;
@@ -1841,14 +1881,14 @@ class Soldado {
     const npel = a.pellets || 1, cliente = REDE.modo === 'cliente' && this.ehJogador, alvosRede = [], senRede = [];
     for (let p = 0; p < npel; p++) {
       dir.copy(frente);
-      dir.x += (Math.random() - 0.5) * 2 * spread; dir.y += (Math.random() - 0.5) * 2 * spread; dir.z += (Math.random() - 0.5) * 2 * spread; dir.normalize();
+      dir.x += (Math.random() - 0.5) * 2 * spread; dir.y += (Math.random() - 0.5) * 2 * spread - (this.ehJogador ? 0 : spread * 0.4); dir.z += (Math.random() - 0.5) * 2 * spread; dir.normalize(); // bots puxam o tiro um pouco para baixo
       const maxD = a.alcance;
       let t = raioMundo(olho, dir, maxD), alvo = null, cabeca = false, perna = false, sentHit = null;
       for (const ent of sentinelasAlvo()) { if (ent.time === this.time) continue; const tb = raioCaixa(olho, dir, ent.box); if (tb <= t + 0.001) { t = tb; sentHit = ent; } }
       for (const s of soldados) {
         if (s === this || !s.vivo) continue;
         const c = s.centro; const h = s.alturaAtual;
-        const tc = raioEsfera(olho, dir, new THREE.Vector3(c.x, s.pos.y + h - 0.2, c.z), 0.22);
+        const tc = raioEsfera(olho, dir, new THREE.Vector3(c.x, s.pos.y + h - 0.2, c.z), this.ehJogador ? 0.22 : 0.15); // bots: cabeça menor (menos headshot)
         if (tc < t) { t = tc; alvo = s; cabeca = true; continue; }
         const box = { min: new THREE.Vector3(s.pos.x - 0.3, s.pos.y, s.pos.z - 0.3), max: new THREE.Vector3(s.pos.x + 0.3, s.pos.y + h - 0.3, s.pos.z + 0.3) };
         const tb = raioCaixa(olho, dir, box);
@@ -1862,7 +1902,7 @@ class Soldado {
       if (sentHit && !alvo) { const dano = a.dano * 0.8; if (cliente) { senRede.push({ i: sentHit.id, d: r2(dano) }); marcarAcerto(); } else danoSentinela(sentHit.se, dano, this); particulas(ponto, 5, '#ffc060', 2.5, 0.4, 0.6); }
       if (alvo) {
         let dano = a.dano * (1 - 0.35 * Math.min(1, t / a.alcance));
-        if (cabeca) dano *= a.hs || 4; else if (perna) dano *= 0.75;
+        if (cabeca) dano *= this.ehJogador ? (a.hs || 4) : Math.min(a.hs || 4, 2.5); else if (perna) dano *= 0.75;
         if (cliente) { if (!(alvo.protegidoAte > tempo)) { alvosRede.push({ i: alvo.nid, d: r2(dano), c: cabeca ? 1 : 0, dx: r2(dir.x), dy: r2(dir.y), dz: r2(dir.z) }); marcarAcerto(); somHit(cabeca); } }
         else aplicarDano(alvo, dano, this, cabeca, a, dir);
         particulas(ponto, 6, '#b3121b', 2.5, 0.5, 0.7); if (Math.random() < 0.5) marcaSangue(ponto, dir);
@@ -2298,7 +2338,7 @@ function atualizarBot(s, dt) {
     } else if (a.tipo === 'faca' && dist > 2.5 && s.armas[2]) s.trocar(2);
     else if (s.armas[1] && s.atual !== 1 && s.municao[s.armas[1]].pente + s.municao[s.armas[1]].reserva > 0 && !(ARMAS[s.armas[1]].tipo === 'lancador' && dist < 10)) s.trocar(1);
     const armaAgora = s.arma;
-    const altMira = armaAgora.tipo === 'lancador' ? 0.15 : (Math.random() < 0.07 * dificuldade ? 0.9 : 0.5 + Math.random() * 0.2);
+    const altMira = armaAgora.tipo === 'lancador' ? 0.15 : (Math.random() < 0.025 * dificuldade ? 0.85 : 0.38 + Math.random() * 0.2);
     const mira = new THREE.Vector3(alvo.pos.x, alvo.pos.y + alvo.alturaAtual * altMira, alvo.pos.z);
     // antecipa um pouco o movimento do alvo
     mira.addScaledVector(alvo.vel, Math.min(0.25, dist / 60) * 0.5);
@@ -2501,7 +2541,7 @@ function botComprar(s) {
       else if (d >= 3100 + 650) compra(s.ia.gosto === 'mp7' ? 'mp7' : s.ia.gosto === 'minigun' || s.ia.gosto === 'bazuca' ? 'acr' : s.ia.gosto);
       else if (d >= 2700 + 650) compra(Math.random() < 0.5 ? 'ak47' : 'type95');
       else if (d >= 2700 && Math.random() < 0.5) compra('ak47');
-      else if (d >= 1600 + 300) compra('mp7');
+      else if (d >= 1500 + 300) { const smgs = ['mp7', 'mp5', 'scorpion', 'ump45', 'pp90', 'vector'].filter(k => ARMAS[k].preco + 300 <= d); compra(smgs[Math.floor(Math.random() * smgs.length)]); }
       else if (d >= 650 + 400 && !s.armas[2].startsWith('mag')) { s.dinheiro -= 650; s.darArma('magnum'); }
     }
   }
@@ -3329,7 +3369,7 @@ function abrirCompra(forcar) {
   if (!podeComprar()) { subaviso('Só é possível comprar no início da rodada, na sua base'); return; }
   compraAberta = true; $('compra').hidden = false; if (document.pointerLockElement) document.exitPointerLock();
   const lista = $('compraLista'); let html = '';
-  const grupos = { pistola: 'Pistolas', smg: 'Submetralhadora', fuzil: 'Fuzis', mg: 'Minigun', lancador: 'Bazuca' };
+  const grupos = { pistola: 'Pistolas', smg: 'Submetralhadoras', fuzil: 'Fuzis', mg: 'Minigun', lancador: 'Bazuca' };
   for (const [tipo, titulo] of Object.entries(grupos)) {
     html += `<div><h3>${titulo}</h3>`;
     for (const [k, a] of Object.entries(ARMAS)) if (a.tipo === tipo) html += `<div class="item ${jogador.dinheiro < a.preco ? 'caro' : ''} ${jogador.armas[a.slot] === k ? 'tem' : ''}" data-arma="${k}"><span>${a.nome}<br><small>${a.tipo === 'lancador' ? 'explosão em área · ' + a.pente + '+' + a.reserva + ' foguetes' : 'dano ' + a.dano + ' · ' + a.cadencia + '/s · pente ' + a.pente + (a.rajada ? ' · rajada de ' + a.rajada : '') + (a.giro ? ' · gira antes de atirar' : '')}</small></span><span class="p">$${a.preco}</span></div>`;
