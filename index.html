@@ -166,7 +166,6 @@
 <div id="barraTxt" class="hud" hidden></div>
 <div id="serie" class="hud painel"></div>
 <div id="apoios" class="hud"></div>
-<div id="marcas" class="hud"></div>
 
 <div id="compra" class="menu" hidden>
   <h2>Comprar equipamento · <span id="compraGrana"></span> · <small>tecla <kbd>B</kbd> fecha</small> <button id="btnRecompra" style="float:right;font-size:12px;padding:4px 10px">↻ Comprar igual à rodada anterior</button></h2>
@@ -1612,7 +1611,7 @@ class Soldado {
     this.municao = {}; // por chave de arma: {pente, reserva}
     this.atual = 2; this.cooldown = 0; this.recarregando = 0; this.trocando = 0; this.tirosSeguidos = 0; this.ultimoTiro = 0;
     this.temBomba = false; this.flash = 0; this.zoom = false; this.tempoParado = 0; this.progresso = 0;
-    this.ia = ehJogador ? null : { alvo: null, caminho: null, destino: null, replan: 0, reacao: 0, rajada: 0, pausa: 0, ultimoVisto: null, estrafe: 0, funcao: 'livre', viuInimigo: 0, via: null, papel: '', bandeira: null, olharYaw: null, olharTroca: 0, olharCabeca: 0, gosto: GOSTOS[Math.floor(Math.random() * GOSTOS.length)], pref: Math.floor(Math.random() * 3), travado: 0, suavizar: 0 };
+    this.ia = ehJogador ? null : { alvo: null, caminho: null, destino: null, replan: 0, reacao: 0, rajada: 0, pausa: 0, ultimoVisto: null, estrafe: 0, funcao: 'livre', viuInimigo: 0, via: null, papel: '', bandeira: null, olharYaw: null, olharTroca: 0, olharCabeca: 0, gosto: GOSTOS[Math.floor(Math.random() * GOSTOS.length)], pref: Math.floor(Math.random() * 3), travado: 0, suavizar: 0, perfil: 'agressivo', atrasoAte: 0, segurando: false, visitaCd: 0 };
     this.mesh = null; this.tempoMorte = 0;
     this.protegidoAte = 0; this.rajadaRest = 0; this.giroMg = 0; this.querGiro = -9; this.faseAnim = Math.random() * 6; this.dirMorte = 1; this.hipYaw = 0;
     this.nid = ++NID_CONTADOR; this.tele = 0; this.tiros = 0; this.remoto = false; this.acaoE = false; this.ultimoDanoDe = 0;
@@ -1923,6 +1922,7 @@ class Soldado {
     this.atual = this.armas[1] ? 1 : 2;
     if (this.ia) { this.ia.alvo = null; this.ia.caminho = null; this.ia.destino = null; this.ia.funcao = 'livre'; this.ia.via = null; this.ia.replan = 0; this.ia.olharYaw = null; }
     this.tele = (this.tele || 0) + 1; this.acaoE = false; this.serie = 0; this.jugg = false;
+    if (this.ia && modoLivre()) this.ia.atrasoAte = tempo + Math.random() * 2.5;
     // nasce olhando para a base inimiga
     const inimigo = SPAWN[this.time === 't' ? 'ct' : 't']; const dx = (inimigo.x1 + inimigo.x2) / 2 - pos.x, dz = (inimigo.z1 + inimigo.z2) / 2 - pos.z;
     this.yaw = Math.atan2(-dx, -dz); this.pitch = 0; this.hipYaw = 0;
@@ -2182,7 +2182,22 @@ function limparBomba() {
 let dificuldade = 1;
 function inimigosDe(s) { return soldados.filter(o => o.time !== s.time && o.vivo); }
 function alcanceEngajar(s) { const t = s.arma.tipo; return t === 'fuzil' ? 46 : t === 'mg' ? 42 : t === 'lancador' ? 48 : t === 'smg' ? 30 : t === 'pistola' ? 25 : 4; }
-function velBot(s) { const a = s.arma; let v = CFG.velCorrida * 0.95 * (a.peso || 1); if (s.giroMg > 0) v *= 0.6; return v; }
+function velBot(s) { const a = s.arma; let v = CFG.velCorrida * 0.95 * (a.peso || 1); if (s.giroMg > 0) v *= 0.6; const p = s.ia && s.ia.perfil; v *= p === 'agressivo' ? 1.05 : p === 'cauteloso' ? 0.85 : 1; return v; }
+// setores do mapa visitados por cada time (grade 8x8): bots preferem áreas há muito tempo sem ninguém
+const VISITAS = { t: new Float32Array(64), ct: new Float32Array(64) };
+function setorDe(x, z) { const R = MAPA.radar; const i = Math.max(0, Math.min(7, Math.floor((x - R.x0) / R.tam * 8))), j = Math.max(0, Math.min(7, Math.floor((z - R.z0) / R.tam * 8))); return j * 8 + i; }
+function marcarVisita(s) { VISITAS[s.time][setorDe(s.pos.x, s.pos.z)] = tempo; }
+function pontoPoucoVisitado(s) { // entre vários pontos aleatórios, o que está no setor há mais tempo sem visita do time (e não muito perto)
+  let melhor = null, mv = -Infinity;
+  for (let k = 0; k < 8; k++) {
+    const p = pontoAleatorioLivre(); if (p.lengthSq() === 0) continue;
+    let v = Math.min(60, tempo - VISITAS[s.time][setorDe(p.x, p.z)]) + Math.random() * 8;
+    for (const o of soldados) if (o !== s && o.vivo && o.time === s.time && o.ia && o.ia.destino) v += Math.min(20, o.ia.destino.distanceTo(p)) * 0.3;
+    v -= Math.max(0, 25 - p.distanceTo(s.pos)) * 0.4;
+    if (v > mv) { mv = v; melhor = p; }
+  }
+  return melhor || pontoAleatorioLivre();
+}
 const clamp1 = v => Math.max(-1, Math.min(1, v));
 // move o bot com aceleração suave e afastamento dos aliados (não andam grudados nem em fila indiana)
 function moverBot(s, mv, dt) {
@@ -2201,6 +2216,7 @@ function atualizarBot(s, dt) {
   const ia = s.ia;
   s.tempoParado += dt; ia.olharCabeca = 0;
   if (partida.estado === 'freeze') { s.vel.x = s.vel.z = 0; return; }
+  ia.visitaCd -= dt; if (ia.visitaCd <= 0) { ia.visitaCd = 0.5; marcarVisita(s); }
   // --- percepção ---
   let melhor = null, melhorD = Infinity;
   const olho = s.olho, frente = s.frente();
@@ -2303,6 +2319,8 @@ function atualizarBot(s, dt) {
   if (m && m.pente < ARMAS[s.chaveArma].pente * 0.4) s.recarregar();
   if (s.arma.tipo === 'lancador' && m && m.pente === 0 && m.reserva === 0 && s.armas[2]) s.trocar(2);
 
+  // --- saída escalonada: cada bot sai da base num momento diferente ---
+  if (tempo < ia.atrasoAte) { moverBot(s, V(), dt); if (ia.olharYaw === null || tempo > ia.olharTroca) { ia.olharTroca = tempo + 1.5 + Math.random() * 2; ia.olharYaw = s.yaw + (Math.random() - 0.5) * 1.5; } s.yaw += anguloDiff(ia.olharYaw, s.yaw) * Math.min(1, dt * 2.5); return; }
   // --- objetivo / destino ---
   ia.replan -= dt;
   if (ia.replan <= 0 || !ia.destino) { escolherDestino(s); ia.replan = 2.5 + Math.random() * 2.5; }
@@ -2342,8 +2360,9 @@ function atualizarBot(s, dt) {
       if (s.tempoParado > 1.2 && s.noChao) { s.vel.y = CFG.pulo; s.tempoParado = 0; ia.travado++; if (ia.travado >= 2) { ia.travado = 0; ia.destino = null; ia.caminho = null; ia.replan = 0; } }
     }
   } else {
-    // chegou: fica de guarda olhando em direções plausíveis (não fica girando sem parar)
+    // chegou: fica de guarda olhando em direções plausíveis (não fica girando sem parar); cautelosos seguram a posição por mais tempo
     moverBot(s, V(), dt);
+    if (!ia.segurando) { ia.segurando = true; if (ia.perfil === 'cauteloso' || ia.funcao === 'defender' || ia.funcao === 'guardar') ia.replan = Math.max(ia.replan, 6 + Math.random() * 6); }
     if (ia.olharYaw === null || tempo > ia.olharTroca) {
       ia.olharTroca = tempo + 1.5 + Math.random() * 2.5;
       const alvoZ = SPAWN[s.time === 't' ? 'ct' : 't']; const dx = (alvoZ.x1 + alvoZ.x2) / 2 - s.pos.x, dz = (alvoZ.z1 + alvoZ.z2) / 2 - s.pos.z;
@@ -2360,6 +2379,8 @@ function pontoMeio() { const m = MAPA.meio[Math.floor(Math.random() * MAPA.meio.
 function destinoDominacao(s) {
   const ia = s.ia; let melhor = null, mv = -Infinity;
   const inimigos = inimigosDe(s);
+  const cobertas = BANDEIRAS.every(b => b.dono === s.time || soldados.some(o => o !== s && o.vivo && o.time === s.time && o.ia && o.ia.bandeira === b));
+  if (cobertas && Math.random() < 0.3) { ia.bandeira = null; ia.funcao = 'patrulhar'; return pontoPoucoVisitado(s); }
   for (const b of BANDEIRAS) {
     const d = Math.hypot(b.x - s.pos.x, b.z - s.pos.z);
     const nossa = b.dono === s.time;
@@ -2380,20 +2401,11 @@ function destinoDominacao(s) {
   return pontoPerto(new THREE.Vector3(melhor.x, melhor.y, melhor.z), CFG.domRaio - 1.2);
 }
 function escolherDestino(s) {
-  const ia = s.ia; let destino = null; ia.via = null;
+  const ia = s.ia; let destino = null; ia.via = null; ia.segurando = false;
   if (partida.modo === 'dom') destino = destinoDominacao(s);
   else if (partida.modo === 'dm') {
     if (ia.ultimoVisto && (tempo - ia.viuInimigo < 10 || tempo - (ia.vistoVant || -99) < 4) && Math.random() < 0.7) { destino = pontoPerto(ia.ultimoVisto, 4); ia.funcao = 'cacar'; }
-    else { // ponto aleatório, de preferência longe de onde os aliados já estão indo
-      let mv = -Infinity;
-      for (let k = 0; k < 6; k++) {
-        const p = pontoAleatorioLivre(); let v = Math.random() * 10;
-        for (const o of soldados) if (o !== s && o.vivo && o.time === s.time && o.ia && o.ia.destino) v += Math.min(25, o.ia.destino.distanceTo(p)) * 0.4;
-        v -= Math.max(0, 30 - p.distanceTo(s.pos)) * 0.25;
-        if (v > mv) { mv = v; destino = p; }
-      }
-      ia.funcao = 'livre';
-    }
+    else { destino = pontoPoucoVisitado(s); ia.funcao = 'livre'; } // área do mapa há mais tempo sem ninguém do time
   }
   else if (s.time === 't') {
     if (bomba.chao) { destino = bomba.chao.pos; ia.funcao = 'pegar'; }
@@ -2401,8 +2413,8 @@ function escolherDestino(s) {
     else if (s.temBomba) { const site = SITES[ia.siteEscolhido]; destino = pontoNaZona(site); ia.funcao = 'plantar'; }
     else {
       const port = soldados.find(o => o.temBomba && o.vivo); const siteP = port && port.ia ? port.ia.siteEscolhido : ia.siteEscolhido;
-      if (ia.papel === 'lurker') { destino = pontoNaZona(SITES[1 - siteP]); ia.funcao = 'atacar'; }
-      else if (ia.papel === 'meio' && tempo - (partida.inicioLive || 0) < 45) { destino = pontoMeio(); ia.funcao = 'atacar'; }
+      if (ia.papel === 'lurker') { destino = Math.random() < 0.6 ? pontoNaZona(SITES[1 - siteP]) : pontoPoucoVisitado(s); ia.funcao = 'atacar'; }
+      else if (ia.papel === 'meio' && tempo - (partida.inicioLive || 0) < 45) { destino = Math.random() < 0.5 ? pontoMeio() : pontoPoucoVisitado(s); ia.funcao = 'atacar'; }
       else { destino = pontoNaZona(SITES[siteP]); ia.funcao = 'atacar'; }
     }
   } else {
@@ -2410,7 +2422,7 @@ function escolherDestino(s) {
     else if (ia.ultimoVisto && (tempo - ia.viuInimigo < 8 || tempo - (ia.vistoVant || -99) < 4)) { destino = ia.ultimoVisto; ia.funcao = 'cacar'; }
     else {
       const site = ia.siteEscolhido, def = MAPA.defesa && MAPA.defesa[site], r = Math.random();
-      if (ia.papel === 'meio' && r < 0.7) destino = pontoMeio();
+      if (ia.papel === 'meio' && r < 0.7) destino = Math.random() < 0.5 ? pontoMeio() : pontoPoucoVisitado(s);
       else if (r < 0.45 && def && def.length) { const pt = def[Math.floor(Math.random() * def.length)]; destino = pontoPerto(new THREE.Vector3(pt[0], 0, pt[1]), 2); }
       else destino = pontoNaZona(SITES[site]);
       ia.funcao = 'defender';
@@ -2419,10 +2431,11 @@ function escolherDestino(s) {
   ia.destino = destino;
   // rota alternativa por um ponto intermediário deslocado: cada bot vai por um lado diferente
   let caminho = null; const dist = destino.distanceTo(s.pos);
-  if (dist > 22 && Math.random() < 0.7) {
+  const flanq = ia.perfil === 'flanqueador';
+  if (dist > 22 && Math.random() < (flanq ? 0.95 : 0.7)) {
     const mid = s.pos.clone().lerp(destino, 0.35 + Math.random() * 0.3);
     const perp = new THREE.Vector3(-(destino.z - s.pos.z), 0, destino.x - s.pos.x).normalize();
-    const off = (ia.pref - 1) * 0.3 * dist + (Math.random() - 0.5) * 0.2 * dist;
+    const off = flanq ? (ia.pref % 2 ? 1 : -1) * (0.45 + Math.random() * 0.2) * dist : (ia.pref - 1) * 0.3 * dist + (Math.random() - 0.5) * 0.2 * dist;
     const via = pontoPerto(mid.addScaledVector(perp, off), 5); ia.via = via;
     const c1 = acharCaminho(s.pos, via), c2 = c1 && acharCaminho(via, destino);
     if (c1 && c2 && c1.length + c2.length < dist * 2.4) caminho = c1.concat(c2);
@@ -2439,6 +2452,8 @@ function distribuirPapeis() {
   const ts = embaralha(bots('t')), cts = embaralha(bots('ct'));
   ts.forEach((s, i) => { s.ia.papel = ts.length >= 3 && i === 0 ? 'lurker' : ts.length >= 4 && i === 1 ? 'meio' : 'entrada'; s.ia.pref = i % 3; });
   cts.forEach((s, i) => { s.ia.siteEscolhido = i % 2; s.ia.papel = cts.length >= 4 && i === cts.length - 1 ? 'meio' : 'site'; s.ia.pref = i % 3; });
+  // perfil e atraso de saída diferentes para cada bot, a cada rodada
+  [...ts, ...cts].forEach((s, i) => { s.ia.perfil = ['agressivo', 'cauteloso', 'flanqueador', 'agressivo', 'flanqueador'][Math.floor(Math.random() * 5)]; s.ia.atrasoAte = tempo + (partida.modo === 'bomba' ? CFG.tempoCongelado : 0) + (s.ia.perfil === 'cauteloso' ? 2 + Math.random() * 5 : Math.random() * 3) + (i % 3) * 0.7; });
 }
 function botComprar(s) {
   const livre = modoLivre();
@@ -2470,7 +2485,7 @@ function botComprar(s) {
 // ====================== SÉRIES DE ABATES (killstreaks) ======================
 // abates seguidos sem morrer liberam apoios; vale para o jogador, para os bots e para os jogadores online
 const SERIES = {
-  2: { nome: 'VANT', desc: 'inimigos aparecem no radar do seu time por 25 s', voz: 'UAV online' },
+  2: { nome: 'VANT', desc: 'inimigos aparecem no radar do seu time por 12 s', voz: 'UAV online' },
   3: { nome: 'Reabastecimento', desc: 'munição cheia e uma granada explosiva', voz: 'Resupply' },
   4: { nome: 'Armadura extra', desc: 'colete 150 e capacete', voz: 'Extra armor' },
   5: { nome: 'Ataque aéreo', desc: 'bombardeio no grupo inimigo mais próximo em 3 s', voz: 'Airstrike inbound' },
@@ -2496,7 +2511,7 @@ function ativarSerie(s, n) {
   avisoPara(s, 'Série de ' + n + ' abates: ' + r.nome + '!', '#ffd77a', r.desc);
   if (s.ehJogador) { locutor(r.voz); somTom(700 + n * 60, 0.18, 0.2, 'triangle'); }
   radio(s, r.nome + ' ativado!');
-  if (n === 2) apoio.vant[s.time] = tempo + 25;
+  if (n === 2) apoio.vant[s.time] = tempo + 12;
   else if (n === 3) { for (const k in s.municao) { const a = ARMAS[k]; s.municao[k].pente = a.pente; s.municao[k].reserva = a.reserva; } s.granadas.he = Math.max(s.granadas.he, 1); if (s.remoto && s.conn) { try { s.conn.send({ t: 'ev', ev: [{ t: 'reab' }] }); } catch (e) {} } }
   else if (n === 4) { s.colete = 150; s.capacete = true; }
   else if (n === 5) ataqueAereo(s);
@@ -2901,6 +2916,9 @@ function novaPartida(modo, time) {
   document.getElementById('feed').innerHTML = ''; $('resumo').hidden = true;
   for (const f of foguetes) scene.remove(f.mesh); foguetes.length = 0; limparApoio();
   for (const b of BANDEIRAS) { b.dono = null; b.prog = 0; b.contestada = false; b.nT = b.nCT = 0; }
+  VISITAS.t.fill(-99); VISITAS.ct.fill(-99);
+  // modos livres: sorteia qual time nasce em qual base (o mapa não favorece ninguém)
+  partida.ladoTrocado = modoLivre() && Math.random() < 0.5; aplicarLado(partida.ladoTrocado);
   marcacoesModo(modo);
   jogador = new Soldado(REDE.modo === 'host' ? REDE.nome : 'Você', time, true); soldados.push(jogador);
   // jogadores humanos da sala entram no lugar de bots do time deles
@@ -2918,12 +2936,14 @@ function novaPartida(modo, time) {
     for (const s of soldados) { s.dinheiro = 16000; s.vivo = false; }
     for (const s of soldados) { s.reviver(escolherSpawn(s)); if (s.ia) botComprar(s); }
     jogador.protegidoAte = tempo + 6; abrirCompra(true);
+    const zb = SPAWN[time]; subaviso('Lados sorteados: seu time começa pelo ' + ((zb.z1 + zb.z2) / 2 < 0 ? 'norte' : 'sul') + ' do mapa', true);
     if (modo === 'dm') aviso('Mata-mata por equipes: ' + CFG.dmAbates + ' abates ou 10 minutos', '#fff');
     else { aviso('Dominação: capture as bandeiras A, B e C · quem tiver mais pontos em 10 minutos vence', '#fff'); locutor('Capture the flags'); }
   }
   else iniciarRodada();
   atualizarHUD();
 }
+function aplicarLado(trocado) { SPAWN = trocado ? { ct: MAPA.spawn.t, t: MAPA.spawn.ct } : MAPA.spawn; }
 // ---- renascimento inteligente: longe dos inimigos, fora da linha de visão deles, perto da própria equipe ----
 function escolherSpawn(s) {
   const inimigos = soldados.filter(o => o.vivo && o.time !== s.time && o !== s);
@@ -2974,22 +2994,21 @@ function atualizarBandeiras(dt) {
   partida.tickDom = (partida.tickDom || 0) + dt;
   if (partida.tickDom >= 1) { partida.tickDom -= 1; for (const b of BANDEIRAS) if (b.dono) partida.pts[b.dono]++; }
 }
+// troca de lado a cada rodada (mantém dinheiro, armas e colete; só o kit de desarme fica com quem virou CT)
 function trocarLados() {
   partida.trocou = true; partida.trocarLados = false;
   for (const s of soldados) {
-    s.time = s.time === 't' ? 'ct' : 't'; s.dinheiro = CFG.dinheiroInicial; s.colete = 0; s.capacete = false; s.kit = false; s.granadas = { he: 0, flash: 0, fumaca: 0 };
-    s.armas[1] = null; s.armas[2] = null; s.darArma('p9'); s.vivo = false; if (s.remoto) s.ignorarArmasAte = tempo + 1.5;
+    s.time = s.time === 't' ? 'ct' : 't'; if (s.time === 't') s.kit = false;
     if (s.mesh) { scene.remove(s.mesh); s.mesh = null; s.criarMesh(); }
   }
   criarRotulos();
-  partida.pts = { t: partida.pts.ct, ct: partida.pts.t }; partida.derrotas = { t: 0, ct: 0 };
+  partida.pts = { t: partida.pts.ct, ct: partida.pts.t }; partida.derrotas = { t: partida.derrotas.ct, ct: partida.derrotas.t };
   partida.timeJogador = jogador.time;
-  if (jogador.time === 'ct') for (const s of soldados) if (s.ia && s.time === 'ct' && Math.random() < 0.5 && s.dinheiro >= 200) { s.dinheiro -= 200; s.kit = true; }
-  aviso('Troca de lados! Você agora é ' + (jogador.time === 'ct' ? 'Contra-Terrorista' : 'Terrorista'), '#ffd77a', true); evento({ t: 'aviso', txt: 'Troca de lados!', cor: '#ffd77a' }); evento({ t: 'lados' }); locutor('Switching sides');
+  aviso('Troca de lados! Você agora é ' + (jogador.time === 'ct' ? 'Contra-Terrorista' : 'Terrorista'), '#ffd77a', true); evento({ t: 'aviso', txt: 'Troca de lados!', cor: '#ffd77a' }); locutor('Switching sides');
   construirArmaVisual();
 }
 function iniciarRodada() {
-  if (partida.trocarLados) trocarLados();
+  if (partida.rodada >= 1) trocarLados(); // a cada rodada os times trocam de base
   partida.rodada++; partida.estado = 'freeze'; partida.tempo = CFG.tempoCongelado; partida.temporizadorFim = 0; $('resumo').hidden = true;
   limparBomba(); limparArmasChao(); limparMarcas();
   for (const g of granadas) scene.remove(g.mesh); granadas.length = 0;
@@ -3030,7 +3049,7 @@ function fimRodada(vencedor, motivo) {
   locutor(vencedor === 'ct' ? 'Counter terrorists win' : 'Terrorists win');
   fecharMenus(); barra(null);
   if (partida.pts[vencedor] >= CFG.rodadasVitoria) { partida.fim = true; }
-  else if (partida.rodada === CFG.rodadasVitoria - 1 && !partida.trocou) { partida.trocarLados = true; subaviso(motivo + ' · Próxima rodada: troca de lados!'); }
+  else subaviso(motivo + ' · Próxima rodada: troca de lados!');
 }
 function atualizarPartida(dt) {
   if (modoLivre()) {
@@ -3206,24 +3225,10 @@ function atualizarHUD() {
   const nS = (REDE.modo === 'cliente' ? [...REDE.sentinelas.values()] : apoio.sentinelas).filter(x => x.time === j.time).length; if (nS) ap.push('🔫 Sentinela ×' + nS);
   const nD = (REDE.modo === 'cliente' ? [...REDE.drones.values()] : apoio.drones).filter(x => x.time === j.time).length; if (nD) ap.push('🚁 Drone');
   const htmlA = ap.map(x => '<div>' + x + '</div>').join(''); const elA = $('apoios'); if (elA.innerHTML !== htmlA) elA.innerHTML = htmlA;
-  marcarInimigosNaTela(vantAtivo(j.time, inim));
+
   if (j.protegidoAte > tempo && j.vivo) { $('subaviso').textContent = 'Protegido por ' + Math.ceil(j.protegidoAte - tempo) + 's'; subavisoTimer = 0.5; }
   $('mira').style.transform = 'scale(' + (1 + Math.hypot(j.vel.x, j.vel.z) * 0.12 + j.tirosSeguidos * 0.15 + (j.noChao ? 0 : 0.8)) + ')';
   $('mira').style.opacity = j.zoom || !j.vivo ? 0 : 1;
-}
-// VANT: marca os inimigos na tela (mesmo atrás de paredes), com distância
-const _proj = new THREE.Vector3();
-function marcarInimigosNaTela(ativo) {
-  const c = $('marcas'); if (!ativo || !jogador.vivo) { if (c.childElementCount) c.innerHTML = ''; return; }
-  const inimigos = soldados.filter(s => s.vivo && s.time !== jogador.time);
-  while (c.childElementCount < inimigos.length) { const d = document.createElement('div'); d.className = 'marca'; d.innerHTML = '<span></span><i></i>'; c.appendChild(d); }
-  while (c.childElementCount > inimigos.length) c.removeChild(c.lastChild);
-  inimigos.forEach((e, i) => {
-    const el = c.children[i]; _proj.set(e.pos.x, e.pos.y + e.alturaAtual + 0.35, e.pos.z).project(camera);
-    if (_proj.z > 1 || Math.abs(_proj.x) > 1.05 || Math.abs(_proj.y) > 1.05) { el.style.display = 'none'; return; }
-    el.style.display = ''; el.style.left = ((_proj.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - _proj.y) / 2 * innerHeight) + 'px';
-    el.firstChild.textContent = Math.round(e.pos.distanceTo(jogador.pos)) + 'm';
-  });
 }
 function atualizarOverlays(dt) {
   avisoTimer -= dt; subavisoTimer -= dt; danoTimer -= dt; hitTimer -= dt; flashTela = Math.max(0, flashTela - dt);
@@ -3249,12 +3254,22 @@ function desenharRadar() {
   if (bomba.estado === 'plantada' || bomba.chao) { const p = bomba.estado === 'plantada' ? bomba.pos : bomba.chao.pos; c.fillStyle = '#ff3030'; c.beginPath(); c.arc(px(p.x), pz(p.z), 3.5, 0, Math.PI * 2); c.fill(); }
   for (const s of soldados) {
     if (!s.vivo) continue;
-    if (s.time !== jogador.time) { if (tempo - s.avistado < 2.5 || vantAtivo(jogador.time, s.time)) { c.fillStyle = '#ff4040'; c.beginPath(); c.arc(px(s.pos.x), pz(s.pos.z), 3, 0, Math.PI * 2); c.fill(); } continue; }
+    if (s.time !== jogador.time) {
+      const vant = vantAtivo(jogador.time, s.time);
+      if (vant || tempo - s.avistado < 2.5) { c.fillStyle = '#ff4040'; c.beginPath(); c.arc(px(s.pos.x), pz(s.pos.z), vant ? 5.5 : 3, 0, Math.PI * 2); c.fill(); if (vant) { c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.stroke(); } }
+      continue;
+    }
     if (s.ehJogador) { c.save(); c.translate(px(s.pos.x), pz(s.pos.z)); c.rotate(-s.yaw); c.fillStyle = 'rgba(255,255,255,.12)'; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 26, -Math.PI / 2 - 0.6, -Math.PI / 2 + 0.6); c.closePath(); c.fill(); c.restore(); }
     c.fillStyle = s.ehJogador ? '#ffffff' : (s.time === 't' ? '#e0a640' : '#5fa8ff');
     c.save(); c.translate(px(s.pos.x), pz(s.pos.z)); c.rotate(-s.yaw);
     c.beginPath(); c.moveTo(0, -5); c.lineTo(3.5, 3.5); c.lineTo(-3.5, 3.5); c.closePath(); c.fill(); c.restore();
     if (s.temBomba) { c.fillStyle = '#ff3030'; c.fillRect(px(s.pos.x) + 3, pz(s.pos.z) - 6, 4, 4); }
+  }
+  // VANT ativo: linha de varredura subindo pelo radar
+  if (apoio.vant[jogador.time] > tempo) {
+    const y = S - ((tempo * 45) % S); const gr = c.createLinearGradient(0, y, 0, y + 22); gr.addColorStop(0, 'rgba(120,255,120,.55)'); gr.addColorStop(1, 'rgba(120,255,120,0)');
+    c.fillStyle = gr; c.fillRect(0, y, S, 22); c.fillStyle = 'rgba(160,255,160,.9)'; c.fillRect(0, y, S, 1.5);
+    c.strokeStyle = 'rgba(120,255,120,.6)'; c.lineWidth = 2; c.strokeRect(1, 1, S - 2, S - 2);
   }
 }
 // placar
@@ -3504,6 +3519,16 @@ function atualizarLobby(lista) {
   el.hidden = false;
   if (REDE.modo === 'host') $('btnJogar').textContent = lista.length > 1 ? 'INICIAR PARTIDA · ' + lista.length + ' jogadores' : 'INICIAR (aguardando amigos… ou jogue só com bots)';
 }
+const LINK_SITE = 'https://ugororszagh-hub.github.io/operacao-areia/';
+function erroRede(e, cod) {
+  const t = e && e.type;
+  if (t === 'browser-incompatible') return 'Este navegador ou esta página não permite conexão direta entre jogadores (WebRTC). Abra o jogo pelo link do site: ' + LINK_SITE;
+  if (t === 'unavailable-id') return 'Código em uso, tente criar de novo.';
+  if (t === 'peer-unavailable') return 'Sala ' + cod + ' não encontrada. Confira o código com o host (ele precisa estar com o jogo aberto).';
+  if (t === 'network' || t === 'socket-error' || t === 'server-error' || t === 'socket-closed') return 'Sem contato com o servidor de conexão (internet ou firewall bloqueando). Tente de novo ou use outra rede/Wi-Fi.';
+  return 'Erro de rede: ' + (t || e);
+}
+if (/claude/i.test(location.host)) { const el = document.getElementById('onlineStatus'); el.innerHTML = 'Aqui dentro do claude.ai o modo online não conecta. Para jogar com amigos abra pelo site: <a href="' + LINK_SITE + '" target="_blank" style="color:#9dff5a">' + LINK_SITE + '</a>'; el.style.color = '#ffd77a'; }
 function carregarPeerJS(cb) {
   if (window.Peer) return cb();
   statusOnline('Carregando biblioteca de rede…', '#ffd77a');
@@ -3528,7 +3553,7 @@ function criarSala() {
       conn.on('open', () => { conn.on('data', d => receberDoCliente(conn, d)); });
       conn.on('close', () => removerCliente(conn)); conn.on('error', () => removerCliente(conn));
     });
-    peer.on('error', e => statusOnline('Erro de rede: ' + (e.type === 'unavailable-id' ? 'código em uso, tente de novo' : e.type), '#ff6a6a'));
+    peer.on('error', e => statusOnline(erroRede(e), '#ff6a6a'));
   });
 }
 function entrarSala() {
@@ -3548,7 +3573,7 @@ function entrarSala() {
       });
       conn.on('error', e => statusOnline('Erro na conexão: ' + e, '#ff6a6a'));
     });
-    peer.on('error', e => statusOnline(e.type === 'peer-unavailable' ? 'Sala ' + cod + ' não encontrada. Confira o código com o host.' : 'Erro de rede: ' + e.type, '#ff6a6a'));
+    peer.on('error', e => statusOnline(erroRede(e, cod), '#ff6a6a'));
   });
 }
 // ---- host ----
@@ -3614,7 +3639,7 @@ function adicionarRemoto(reg) {
   else if (partida.estado === 'freeze') { r.dinheiro = CFG.dinheiroInicial; r.reviver(pontoNaZona(SPAWN[r.time])); }
   else { r.vivo = false; r.tempoMorte = 99; r.dinheiro = CFG.dinheiroInicial; }
   criarRotulos();
-  reg.conn.send({ t: 'inicio', mapa: MAPA.id, modo: partida.modo, nid: r.nid, time: r.time, nome: r.nome, sala: REDE.sala });
+  reg.conn.send({ t: 'inicio', mapa: MAPA.id, modo: partida.modo, nid: r.nid, time: r.time, nome: r.nome, sala: REDE.sala, lado: !!partida.ladoTrocado });
 }
 function removerCliente(conn) {
   const reg = REDE.conns.get(conn.peer); if (!reg) return; REDE.conns.delete(conn.peer);
@@ -3676,7 +3701,7 @@ function receberDoHost(d) {
 }
 function iniciarCliente(d) {
   iniciarAudio();
-  carregarMapa(d.mapa);
+  carregarMapa(d.mapa); aplicarLado(!!d.lado);
   partida.modo = d.modo; partida.estado = 'live'; partida.pts = { t: 0, ct: 0 }; partida.rodada = 0; partida.tempoDM = 0;
   for (const s of soldados) if (s.mesh) scene.remove(s.mesh); soldados.length = 0;
   for (const m of [REDE.granadas, REDE.foguetes, REDE.armasChao]) { for (const o of m.values()) scene.remove(o); m.clear(); }
@@ -3824,7 +3849,7 @@ $('btnJogar').onclick = () => {
   $('inicio').hidden = true; $('fim').hidden = true; $('touch').hidden = !MOBILE;
   pausaAberta = false; $('pausa').hidden = true;
   novaPartida(modo, time); criarRotulos();
-  if (REDE.modo === 'host') for (const reg of REDE.conns.values()) if (reg.soldado) { try { reg.conn.send({ t: 'inicio', mapa: MAPA.id, modo, nid: reg.soldado.nid, time: reg.time, nome: reg.nome, sala: REDE.sala }); } catch (e) {} }
+  if (REDE.modo === 'host') for (const reg of REDE.conns.values()) if (reg.soldado) { try { reg.conn.send({ t: 'inicio', mapa: MAPA.id, modo, nid: reg.soldado.nid, time: reg.time, nome: reg.nome, sala: REDE.sala, lado: !!partida.ladoTrocado }); } catch (e) {} }
   canvas.focus(); if (!compraAberta) travarMouse();
 };
 $('btnDeNovo').onclick = () => { $('fim').hidden = true; $('inicio').hidden = false; partida.estado = 'inicio'; };
