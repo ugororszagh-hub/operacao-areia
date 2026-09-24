@@ -1869,7 +1869,7 @@ class Soldado {
     let spread = a.spread;
     if (a.zoom) spread = this.zoom ? a.spread : a.spreadSemZoom;
     spread *= 1 + velH * 0.25 + this.tirosSeguidos * 0.18; if (this.agachado) spread *= 0.7; if (!this.noChao) spread *= 3;
-    if (!this.ehJogador) spread *= 1.2;
+    if (!this.ehJogador) spread *= 1.3 / Math.sqrt(dificuldade); // fácil 1.68 · normal 1.3 · difícil 1.06
     if (a.tipo === 'lancador') {
       dir.copy(frente); dir.x += (Math.random() - 0.5) * 2 * spread; dir.y += (Math.random() - 0.5) * 2 * spread; dir.normalize();
       const origem = olho.clone().addScaledVector(dir, 0.9).add(new THREE.Vector3(0, -0.1, 0));
@@ -1881,14 +1881,14 @@ class Soldado {
     const npel = a.pellets || 1, cliente = REDE.modo === 'cliente' && this.ehJogador, alvosRede = [], senRede = [];
     for (let p = 0; p < npel; p++) {
       dir.copy(frente);
-      dir.x += (Math.random() - 0.5) * 2 * spread; dir.y += (Math.random() - 0.5) * 2 * spread - (this.ehJogador ? 0 : spread * 0.4); dir.z += (Math.random() - 0.5) * 2 * spread; dir.normalize(); // bots puxam o tiro um pouco para baixo
+      dir.x += (Math.random() - 0.5) * 2 * spread; dir.y += (Math.random() - 0.5) * 2 * spread - (this.ehJogador ? 0 : spread * 0.15); dir.z += (Math.random() - 0.5) * 2 * spread; dir.normalize(); // bots puxam o tiro um pouco para baixo
       const maxD = a.alcance;
       let t = raioMundo(olho, dir, maxD), alvo = null, cabeca = false, perna = false, sentHit = null;
       for (const ent of sentinelasAlvo()) { if (ent.time === this.time) continue; const tb = raioCaixa(olho, dir, ent.box); if (tb <= t + 0.001) { t = tb; sentHit = ent; } }
       for (const s of soldados) {
         if (s === this || !s.vivo) continue;
         const c = s.centro; const h = s.alturaAtual;
-        const tc = raioEsfera(olho, dir, new THREE.Vector3(c.x, s.pos.y + h - 0.2, c.z), this.ehJogador ? 0.22 : 0.15); // bots: cabeça menor (menos headshot)
+        const tc = raioEsfera(olho, dir, new THREE.Vector3(c.x, s.pos.y + h - 0.2, c.z), this.ehJogador ? 0.22 : (dificuldade >= 1.5 ? 0.17 : dificuldade <= 0.6 ? 0.12 : 0.15)); // bots: cabeça menor (menos headshot)
         if (tc < t) { t = tc; alvo = s; cabeca = true; continue; }
         const box = { min: new THREE.Vector3(s.pos.x - 0.3, s.pos.y, s.pos.z - 0.3), max: new THREE.Vector3(s.pos.x + 0.3, s.pos.y + h - 0.3, s.pos.z + 0.3) };
         const tb = raioCaixa(olho, dir, box);
@@ -1963,7 +1963,7 @@ class Soldado {
     for (const k in this.municao) { const a = ARMAS[k]; this.municao[k].pente = a.pente; this.municao[k].reserva = a.reserva; }
     this.atual = this.armas[1] ? 1 : 2;
     if (this.ia) { this.ia.alvo = null; this.ia.caminho = null; this.ia.destino = null; this.ia.funcao = 'livre'; this.ia.via = null; this.ia.replan = 0; this.ia.olharYaw = null; }
-    this.tele = (this.tele || 0) + 1; this.acaoE = false; this.serie = 0; this.jugg = false;
+    this.tele = (this.tele || 0) + 1; this.acaoE = false; this.jugg = false; // a série de abates só zera quando o soldado morre (em matar)
     if (this.ia && modoLivre()) this.ia.atrasoAte = tempo + Math.random() * 2.5;
     // nasce olhando para a base inimiga
     const inimigo = SPAWN[this.time === 't' ? 'ct' : 't']; const dx = (inimigo.x1 + inimigo.x2) / 2 - pos.x, dz = (inimigo.z1 + inimigo.z2) / 2 - pos.z;
@@ -2302,7 +2302,7 @@ function atualizarBot(s, dt) {
     if (temVisao(olho, e.centro, 80) || temVisao(olho, new THREE.Vector3(e.pos.x, e.pos.y + e.alturaAtual - 0.2, e.pos.z), 80)) { melhor = e; melhorD = d; }
   }
   if (melhor) {
-    if (ia.alvo !== melhor) { ia.reacao = 0.9 / dificuldade + Math.random() * 0.5; if (tempo - (ia.ultimoRadio || -99) > 10 && Math.random() < 0.6) { radio(s, 'Inimigo avistado ' + nomeZona(melhor.pos) + '!'); ia.ultimoRadio = tempo; } }
+    if (ia.alvo !== melhor) { ia.reacao = 0.75 / dificuldade + Math.random() * 0.4; if (tempo - (ia.ultimoRadio || -99) > 10 && Math.random() < 0.6) { radio(s, 'Inimigo avistado ' + nomeZona(melhor.pos) + '!'); ia.ultimoRadio = tempo; } }
     ia.alvo = melhor; ia.ultimoVisto = melhor.pos.clone(); ia.viuInimigo = tempo; melhor.avistado = tempo;
   } else if (ia.alvo && (tempo - ia.viuInimigo > 4 || !ia.alvo.vivo)) ia.alvo = null;
   if (!melhor && vantAtivo(s.time, s.time === 't' ? 'ct' : 't') && (tempo - (ia.vistoVant || -9)) > 2) { let pe = null, pd = 60; for (const e of inimigosDe(s)) { const d = e.pos.distanceTo(s.pos); if (d < pd) { pd = d; pe = e; } } if (pe) { ia.ultimoVisto = pe.pos.clone(); ia.vistoVant = tempo; } }
@@ -2338,13 +2338,13 @@ function atualizarBot(s, dt) {
     } else if (a.tipo === 'faca' && dist > 2.5 && s.armas[2]) s.trocar(2);
     else if (s.armas[1] && s.atual !== 1 && s.municao[s.armas[1]].pente + s.municao[s.armas[1]].reserva > 0 && !(ARMAS[s.armas[1]].tipo === 'lancador' && dist < 10)) s.trocar(1);
     const armaAgora = s.arma;
-    const altMira = armaAgora.tipo === 'lancador' ? 0.15 : (Math.random() < 0.025 * dificuldade ? 0.85 : 0.38 + Math.random() * 0.2);
+    const altMira = armaAgora.tipo === 'lancador' ? 0.15 : (Math.random() < 0.03 * dificuldade ? 0.85 : 0.48 + Math.random() * 0.17); // mira no peito
     const mira = new THREE.Vector3(alvo.pos.x, alvo.pos.y + alvo.alturaAtual * altMira, alvo.pos.z);
     // antecipa um pouco o movimento do alvo
     mira.addScaledVector(alvo.vel, Math.min(0.25, dist / 60) * 0.5);
     const d = V().subVectors(mira, olho); const dd = d.length(); d.normalize();
     const velAlvo = Math.hypot(alvo.vel.x, alvo.vel.z), velBotH = Math.hypot(s.vel.x, s.vel.z);
-    const erro = (0.11 / dificuldade) * (1 + dist / 25) * (1 + velAlvo * 0.12 + velBotH * 0.1) + (s.flash > 0 ? 0.35 : 0) + s.tirosSeguidos * 0.012;
+    const erro = (0.085 / dificuldade) * (1 + dist / 30) * (1 + velAlvo * 0.1 + velBotH * 0.08) + (s.flash > 0 ? 0.35 : 0) + s.tirosSeguidos * 0.01;
     const yawAlvo = Math.atan2(-d.x, -d.z) + (Math.random() - 0.5) * erro;
     const pitchAlvo = Math.asin(clamp1(d.y)) + (Math.random() - 0.5) * erro;
     const giro = Math.min(1, dt * 4.5 * dificuldade);
