@@ -195,6 +195,7 @@
     <label title="Só o host decide. Os dois times sempre ficam do mesmo tamanho: bots completam.">Times <select id="times"><option value="livre">cada um escolhe</option><option value="aleatorio">sorteio equilibrado</option><option value="juntos">amigos juntos vs bots</option></select></label>
   </div>
   <div id="salaInfo" hidden style="margin:4px 0 8px;font-size:13px">Sala <b id="salaCod" style="font-size:20px;letter-spacing:3px;color:#ffd77a"></b> · <input id="salaLink" readonly style="width:260px;font-size:11px"> <button id="btnCopiarLink" style="font-size:12px;padding:4px 10px">Copiar link</button></div>
+  <div id="salaJogadores" hidden style="margin:4px 0 8px;font-size:13px;background:rgba(0,0,0,.3);border-radius:6px;padding:6px 10px"></div>
   <p id="onlineStatus" style="color:#8fe07a;min-height:1em"></p>
   <button class="grande" id="btnJogar">JOGAR</button>
   <p class="soPc">Clique no jogo para travar o mouse. <kbd>Esc</kbd> solta.</p>
@@ -3443,6 +3444,17 @@ const REDE = { modo: null, peer: null, conns: new Map(), conn: null, sala: '', n
 let NID_CONTADOR = 0, ID_OBJ = 0;
 const soldadoPorNid = nid => soldados.find(s => s.nid === nid);
 function statusOnline(txt, cor = '#8fe07a') { const el = $('onlineStatus'); el.textContent = txt; el.style.color = cor; const h = $('onlineHud'); if (h) { h.hidden = !REDE.modo; h.textContent = REDE.modo ? 'Sala ' + REDE.sala + ' · ' + (REDE.modo === 'host' ? (REDE.conns.size + 1) + ' jogador(es)' : 'conectado') : ''; } }
+// lista de quem está na sala: o host monta, mostra e manda para os convidados
+function listaSala() { const nomeT = t => t === 'ct' ? 'CT' : 'T'; const l = [{ nome: REDE.nome, time: document.querySelector('input[name=time]:checked').value, host: true }, ...[...REDE.conns.values()].map(r => ({ nome: r.nome, time: r.time }))]; return l; }
+function atualizarLobby(lista) {
+  if (REDE.modo === 'host') { lista = listaSala(); for (const reg of REDE.conns.values()) { try { reg.conn.send({ t: 'sala', lista, times: modoTimes() }); } catch (e) {} } }
+  const el = $('salaJogadores'); if (!el) return;
+  const mt = REDE.modo === 'host' ? modoTimes() : (REDE.modoTimes || 'livre');
+  const desc = { livre: 'cada um escolhe o time', aleatorio: 'times sorteados ao iniciar', juntos: 'todos no time do host' }[mt];
+  el.innerHTML = '<b>Na sala (' + lista.length + '):</b> ' + lista.map(p => '<span style="color:' + (p.time === 't' ? '#e0a640' : '#5fa8ff') + '">' + p.nome + (p.host ? ' 👑' : '') + (mt === 'livre' ? ' (' + (p.time === 't' ? 'T' : 'CT') + ')' : '') + '</span>').join(' · ') + '<br><small>' + desc + '</small>';
+  el.hidden = false;
+  if (REDE.modo === 'host') $('btnJogar').textContent = lista.length > 1 ? 'INICIAR PARTIDA · ' + lista.length + ' jogadores' : 'INICIAR (aguardando amigos… ou jogue só com bots)';
+}
 function carregarPeerJS(cb) {
   if (window.Peer) return cb();
   statusOnline('Carregando biblioteca de rede…', '#ffd77a');
@@ -3461,7 +3473,7 @@ function criarSala() {
       const link = location.origin + location.pathname + '?sala=' + cod;
       statusOnline('Sala ' + cod + ' criada. Mande o código (ou o link) para os amigos e clique em JOGAR quando todos entrarem.');
       $('salaInfo').hidden = false; $('salaCod').textContent = cod; $('salaLink').value = link; $('btnCriarSala').disabled = true; $('btnEntrarSala').disabled = true;
-      setInterval(enviarSnapshot, 66);
+      setInterval(enviarSnapshot, 66); atualizarLobby(); $('times').onchange = () => atualizarLobby(); for (const r of document.querySelectorAll('input[name=time]')) r.addEventListener('change', () => atualizarLobby());
     });
     peer.on('connection', conn => {
       conn.on('open', () => { conn.on('data', d => receberDoCliente(conn, d)); });
@@ -3499,7 +3511,7 @@ function receberDoCliente(conn, d) {
     const time = d.time === 't' ? 't' : 'ct', nome = (d.nome || 'Jogador').slice(0, 12);
     const reg = { conn, nome, time, soldado: null }; REDE.conns.set(conn.peer, reg);
     if (partida.estado !== 'inicio' && partida.estado !== 'encerrada') adicionarRemoto(reg);
-    statusOnline('Sala ' + REDE.sala + ' · ' + (REDE.conns.size + 1) + ' jogador(es): ' + [...REDE.conns.values()].map(r => r.nome + ' (' + r.time.toUpperCase() + ')').join(', ') + '. Times: ' + { livre: 'escolha livre', aleatorio: 'sorteio', juntos: 'todos juntos' }[modoTimes()] + '.'); subaviso(nome + ' entrou na sala');
+    statusOnline('Sala ' + REDE.sala + ' · ' + nome + ' entrou.'); subaviso(nome + ' entrou na sala'); atualizarLobby(); somTom(900, 0.1, 0.15, 'triangle');
     return;
   }
   if (!info || !info.soldado) return;
@@ -3563,7 +3575,7 @@ function removerCliente(conn) {
     if (r.mesh) scene.remove(r.mesh); soldados.splice(soldados.indexOf(r), 1);
     if (partida.estado !== 'inicio' && partida.estado !== 'encerrada') { const b = new Soldado(nomeLivre(r.time), r.time); b.ia.siteEscolhido = Math.floor(Math.random() * 2); b.ia.habilidade = 1; soldados.push(b); if (modoLivre()) { b.dinheiro = 16000; b.reviver(escolherSpawn(b)); botComprar(b); } else b.vivo = false; criarRotulos(); }
   }
-  statusOnline('Sala ' + REDE.sala + ' · ' + (REDE.conns.size + 1) + ' jogador(es): ' + reg.nome + ' saiu.'); subaviso(reg.nome + ' saiu da sala');
+  statusOnline('Sala ' + REDE.sala + ' · ' + reg.nome + ' saiu.'); subaviso(reg.nome + ' saiu da sala'); atualizarLobby();
 }
 // tracejante e som de um tiro dado por outro jogador (host ou cliente)
 function efeitoTiroRemoto(s, chave) {
@@ -3603,6 +3615,7 @@ function enviarSnapshot() {
 function receberDoHost(d) {
   if (d.t === 'inicio') iniciarCliente(d);
   else if (d.t === 'snap') aplicarSnapshot(d);
+  else if (d.t === 'sala') { REDE.modoTimes = d.times; atualizarLobby(d.lista || []); statusOnline('Conectado à sala ' + REDE.sala + ' ✔ · aguardando o host clicar em INICIAR'); }
   else if (d.t === 'ev') { for (const ev of d.ev || []) replicarEvento(ev); }
   else if (d.t === 'compra') {
     if (!d.ok) { subaviso('Compra recusada'); return; }
