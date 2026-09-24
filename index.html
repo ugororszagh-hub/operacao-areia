@@ -487,6 +487,16 @@ function construirDeserto() {
   caixa(28, -60, 29, -52, H); caixa(28, -46, 29, -41, H);                                  // muro oeste do site A
   caixa(-59, -42, -54, -41, H); caixa(-48, -42, -38, -41, H); caixa(-32, -42, -29, -41, H); // sul do site B (entradas x -54..-48 e -38..-32)
   caixa(29, -42, 32, -41, H); caixa(38, -42, 48, -41, H); caixa(54, -42, 59, -41, H);       // sul do site A (entradas x 32..38 e 48..54)
+  // --- frente das bases: muro com duas portas e anteparo interno (ninguém enxerga o spawn da praça) ---
+  for (const sg of [-1, 1]) {
+    const z1 = sg < 0 ? -41.5 : 40.5, z2 = sg < 0 ? -40.5 : 41.5, zi1 = sg < 0 ? -47 : 46, zi2 = sg < 0 ? -46 : 47;
+    caixa(-14, z1, -11, z2, H, COR_PAREDE2); caixa(-7, z1, 7, z2, H, COR_PAREDE2); caixa(11, z1, 14, z2, H, COR_PAREDE2);   // portas em x -11..-7 e 7..11
+    caixa(-14, zi1, -4, zi2, H, COR_PAREDE2); caixa(4, zi1, 14, zi2, H, COR_PAREDE2);                                     // anteparos: entra e vira para o meio
+    caixa(-11, z1, -7, z2, 0.9, COR_PAREDE2, 3.3); caixa(7, z1, 11, z2, 0.9, COR_PAREDE2, 3.3);                           // vergas
+  }
+  // cobertura extra nas ruas do meio
+  caixa(-11, -34, -8, -31, HC, COR_CAIXA); caixa(8, 31, 11, 34, HC, COR_CAIXA); caixa(-9, -33, -8, -31, HC, COR_CAIXA, HC); caixa(8, 31, 9, 33, HC, COR_CAIXA, HC);
+  conteiner(-13, -18, -8, -15, '#4f7a3a'); conteiner(8, 15, 13, 18, '#b3452f');
   // --- quarteirões superiores (z -35..-9) com túneis cobertos em x ±28..32 ---
   caixa(16, -35, 28, -9, H); caixa(32, -35, 44, -9, H); caixa(28, -35, 32, -9, 1.2, COR_PAREDE2, H - 1.2);
   caixa(-28, -35, -16, -9, H); caixa(-44, -35, -32, -9, H); caixa(-32, -35, -28, -9, 1.2, COR_PAREDE2, H - 1.2);
@@ -915,9 +925,11 @@ function metadeVila(corCasa, corCarro) {
   carro(14, -21.3, 'z', corCarro); armario(G2 - 1.0, GZ1 + 0.3, G2 - 0.3, GZ1 + 5, 0, 2.0); movel(G1 + 0.3, GZ1 + 0.3, G1 + 2.5, GZ1 + 1.2, 1.0, '#6a6e72'); pilhaCaixas(G1 + 0.4, GZ2 - 2.0);
   luzInterna(14, 2.8, -21);
   // ---- quintal lateral entre casa e garagem: cercado, com portão para a rua ----
-  cerca(-12, -13.75, -4, -13.6, 1.4, CERCA); cerca(0, -13.75, 8, -13.6, 1.4, CERCA);                       // cerca frontal com portão (-4..0)
+  cerca(-12, -13.75, -4, -13.6, 1.9, CERCA); cerca(0, -13.75, 8, -13.6, 1.9, CERCA);                       // cerca frontal alta com portão (-4..0)
   pilhaCaixas(-6, -25); pilhaCaixas(-4.8, -23.8); movel(2, -20, 5, -18.5, 0.8, '#7a6a5a'); movel(-1, -27.5, 1.6, -26.3, 0.9, '#5a5a5a'); // engradados, mesa, churrasqueira
   cerca(-12, -30.05, -3, -29.95, 1.8, CERCA); cerca(2, -30.05, 8, -29.95, 1.8, CERCA);                       // cerca alta entre quintal lateral e dos fundos (vão no meio)
+  caixa(-5.5, -33.2, 3.5, -32.4, 2.2, 'tabuas:#b8a888'); telhado(-5.5, -33.2, 3.5, -32.4, 2.2, 0.5, '#5a3a2e', 'x'); // tapume atrás do vão: quem entra vira para o lado
+  pilhaCaixas(20, -19.5); caixa(-36, -22, -34.5, -19, 1.1, 'madeira'); caixa(22, -8, 25, -7.2, 0.9, 'concreto:#bdb6a8');
   // ---- frente: calçada, cerquinha, árvore, caixa de correio, poste ----
   pisoVisual(-34, -16, -8, -12, 'concreto'); pisoVisual(10, -16, 18, -9, 'concreto'); pisoVisual(-22, -13.6, -20, -9, 'concreto');
   cerca(-36, -12.15, -24, -11.85, 0.9); cerca(-18, -12.15, -8, -11.85, 0.9); cerca(20, -12.15, 34, -11.85, 0.9);
@@ -964,7 +976,8 @@ function construirMansao() {
   paredeX(-27.3, -27, -16, 16, 0, 3.8, C, [vao(-12, -4, 0, 3.0), vao(4, 12, 0, 3.0)]);                   // duas portas de garagem abertas para o sul
   paredeZ(-16, -15.7, -40, -27, 0, 3.8, C, [por(-36, -34, 0, 2.4)]); paredeZ(15.7, 16, -40, -27, 0, 3.8, C, [por(-36, -34, 0, 2.4)]);
   caixa(-16, -40, 16, -27, 0.3, C2, 3.8);
-  carro(-8, -33, 'z', '#1d1d1f'); carro(8, -33, 'z', '#b8b8bc'); armario(-15.4, -39.7, -10, -38.7, 0, 2.0); armario(10, -39.7, 15.4, -38.7, 0, 2.0); pilhaCaixas(-2, -39.5); movel(0.5, -39.6, 3.5, -38.6, 1.0, '#6a6e72');
+  caixa(-13, -31.3, -3, -30.8, 3.8, C); caixa(3, -31.3, 13, -30.8, 3.8, C);                                 // divisórias: o spawn fica atrás, fora da vista do pátio
+  carro(-8, -35, 'z', '#1d1d1f'); carro(8, -35, 'z', '#b8b8bc'); armario(-15.4, -39.7, -10, -38.7, 0, 2.0); armario(10, -39.7, 15.4, -38.7, 0, 2.0); pilhaCaixas(-2, -39.5); movel(0.5, -39.6, 3.5, -38.6, 1.0, '#6a6e72');
   luzInterna(-8, 3.2, -33, 16); luzInterna(8, 3.2, -33, 16);
   // ===== PÁTIO CENTRAL elevado (x -18..18, z -24..6, +1.5 m) com estátua e canteiros =====
   caixa(-18, -24, 18, 8, PAT, 'concreto:#e9e3d6');
@@ -1090,7 +1103,7 @@ const MAPAS = {
     nome: 'Mansão', construir: construirMansao, nav: { x0: -50, z0: -42, n: 100 }, radar: { x0: -49, z0: -49, tam: 98 },
     chao: 'grama', fundo: '#e6ebee', neblina: [90, 260], sol: 0xfff4e0, solInt: 1.65, hemi: [0xbfd8ff, 0x6a8a4a, 0.65],
     sites: [{ nome: 'A', x1: 20.3, z1: -39.7, x2: 45.7, z2: -16.3 }, { nome: 'B', x1: -45.7, z1: -39.7, x2: -24.3, z2: -26.3 }],
-    spawn: { ct: { x1: -13, z1: -39.5, x2: 13, z2: -31 }, t: { x1: -12, z1: 31, x2: 12, z2: 39 } },
+    spawn: { ct: { x1: -13, z1: -39.5, x2: 13, z2: -32 }, t: { x1: -12, z1: 31, x2: 12, z2: 39 } },
     bandeiras: [{ nome: 'A', x: 0, z: -37 }, { nome: 'B', x: 0, z: -2 }, { nome: 'C', x: 0, z: 37 }],
     defesa: [[[33, -28], [25, -20], [42, -18]], [[-35, -33], [-30, -28], [-40, -20]]], meio: [[0, -16], [0, -2], [-33, -7], [33, 1], [0, 18], [-34, 26], [34, 25]],
     zonas: [zona('na garagem', -16, -40, 16, -27), zona('no quarto', -46, -40, -24, -26), zona('na galeria', 20, -40, 46, -16), zona('no corredor oeste', -24, -40, -16, -24), zona('no corredor leste', 16, -40, 20, -16),
