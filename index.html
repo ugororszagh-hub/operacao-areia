@@ -9602,18 +9602,10 @@ const somHit = (cabeca) => somTom(cabeca ? 2200 : 1400, cabeca ? 0.09 : 0.05, 0.
 const somClique = () => somTom(900, 0.03, 0.12, 'square');
 const somPasso = (vol = 0.08, pan = 0, pos = null) => { if (!audio) return; const t = audio.currentTime, s = audio.createBufferSource(); s.buffer = ruido(0.04); const g = audio.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.04); const lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; s.connect(lp); lp.connect(g); const p = pos ? nodo3D(pos) : audio.createStereoPanner ? audio.createStereoPanner() : null; if (p) { if (!pos) p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); p.connect(audio.destination); } else g.connect(audio.destination); s.start(t); };
 // grunhido de dor de quem leva tiro (mais forte no fogo amigo)
-function somDor(pos, forte = false) { // "AI!"/"OUCH": voz sintética (vogal A→U com formantes) e um "tch" no fim
-  if (!audio || !jogador) return; const d = pos.distanceTo(jogador.olho); if (d > 35) return;
-  const v = (forte ? 0.9 : 0.4) * Math.max(0.15, 1 - d / 35), t = audio.currentTime, dur = forte ? 0.5 : 0.38;
-  const saida = audio.createGain(); saida.gain.setValueAtTime(0.0001, t); saida.gain.exponentialRampToValueAtTime(v, t + 0.03); saida.gain.setValueAtTime(v, t + dur * 0.45); saida.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  const p = nodo3D(pos); saida.connect(p); p.connect(audio.destination);
-  const f0 = forte ? 190 : 150;
-  for (const [f1a, f1b, f2a, f2b, ganho] of [[780, 380, 1250, 850, 1], [780, 380, 1250, 850, 0]]) { // duas cópias levemente desafinadas dão corpo
-    const o = audio.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f0 * (ganho ? 1 : 1.01), t); o.frequency.exponentialRampToValueAtTime(f0 * 0.62, t + dur);
-    for (const [fa, fb, q] of [[f1a, f1b, 7], [f2a, f2b, 9]]) { const bp = audio.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(fa, t); bp.frequency.exponentialRampToValueAtTime(fb, t + dur * 0.8); const g = audio.createGain(); g.gain.value = 0.9; o.connect(bp); bp.connect(g); g.connect(saida); }
-    o.start(t); o.stop(t + dur + 0.02);
-  }
-  const ch = audio.createBufferSource(); ch.buffer = ruido(0.07); const hp = audio.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500; const gch = audio.createGain(); gch.gain.setValueAtTime(v * 0.5, t + dur * 0.75); gch.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.75 + 0.07); ch.connect(hp); hp.connect(gch); gch.connect(saida); ch.start(t + dur * 0.75);
+function somDor(pos, forte = false) { // sem grito de dor (o usuário achou que era um zumbido); fogo amigo avisa com dois toques descendentes
+  if (!audio || !jogador || !forte) return; const d = pos.distanceTo(jogador.olho); if (d > 35) return;
+  const v = 0.3 * Math.max(0.2, 1 - d / 35);
+  somTom(620, 0.1, v, 'triangle'); setTimeout(() => somTom(420, 0.16, v, 'triangle'), 110);
 }
 function locutor(texto) {
   evento({ t: 'loc', txt: texto });
