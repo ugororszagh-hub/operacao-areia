@@ -8275,7 +8275,7 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#e9d6b4').convertSRGBToLinear();
 scene.fog = new THREE.Fog(scene.background.clone(), 80, 280);
-const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 300);
+const camera = new THREE.PerspectiveCamera(75, 1, 0.06, 650); // longe o bastante para morros e chão não serem cortados enquanto anda
 camera.rotation.order = 'YXZ';
 const hemi = new THREE.HemisphereLight(0xcfe0ff, 0xa88a58, 0.6); scene.add(hemi);
 const sol = new THREE.DirectionalLight(0xffe0b0, 1.7);
@@ -8408,7 +8408,8 @@ function corHorizonte(img) { // média da faixa logo acima do horizonte: vira a 
 function ceuFoto(id) {
   const t = TEX_CEU[id], info = CEU_INFO[id]; if (!t) return false;
   const m = new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, fog: false, depthWrite: false }); m.userData.cache = true;
-  const geo = new THREE.SphereGeometry(240, 48, 24); geo.userData.cache = true;
+  const geo = new THREE.SphereGeometry(240, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2 + 0.04); geo.userData.cache = true;
+  { const uv = geo.attributes.uv, k = (Math.PI / 2 + 0.04) / Math.PI; for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - (1 - uv.getY(i)) * k); } // mantém o horizonte da foto no horizonte
   const dome = new THREE.Mesh(geo, m); dome.userData.naoMesclar = true; dome.renderOrder = -10; dome.frustumCulled = false;
   const phi = info.u * Math.PI * 2; dome.rotation.y = Math.atan2(Math.sin(phi), -Math.cos(phi)) - Math.atan2(SOL_DIR.z, SOL_DIR.x); // sol da foto = sol da luz
   scene.add(dome); domoCeu = dome; return true;
@@ -8789,7 +8790,7 @@ function arvore(x, z, alt = 5, raio = 2.2, cor = '#3f7a33') {
 function cerca(x1, z1, x2, z2, h = 1.1, cor = '#f2eee4') { // cerca de tábuas brancas (um plano com textura recortada)
   const ex1 = x2 - x1 > z2 - z1; const comp = ex1 ? x2 - x1 : z2 - z1;
   const t = TEX.cerca.clone(); t.needsUpdate = true; t.repeat.set(comp / 0.64, 1);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(comp, h), new THREE.MeshStandardMaterial({ map: t, color: corLinear(cor), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(comp, h), new THREE.MeshStandardMaterial({ map: t, color: corLinear(String(cor).split(':').pop()), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }));
   colocar(m, (x1 + x2) / 2, h / 2, (z1 + z2) / 2, ex1 ? 0 : Math.PI / 2); m.castShadow = false;
   solido(x1, z1, x2, z2, 0, h, false);
 }
@@ -8876,7 +8877,10 @@ function colinas(cor, n = 14, dist = 170) { // morros ao longe: relevo irregular
     const geo = new THREE.SphereGeometry(raio, 28, 14), pos = geo.attributes.position, f1 = Math.random() * 6, f2 = Math.random() * 6;
     for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k); const ruido = 1 + 0.12 * Math.sin(x * 0.09 + f1) * Math.cos(z * 0.08 + f2) + 0.06 * Math.sin(x * 0.23 + z * 0.19 + f1); pos.setXYZ(k, x * ruido, y * ruido, z * ruido); }
     geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, TEX[tipo] ? matTex(tipo, raio / 6, raio / 12, cor) : mat(cor, { roughness: 1 }));
+    // sem neblina (senão viram "fantasmas" translúcidos na frente do céu fotográfico); névoa fixa puxando para a cor do horizonte
+    const mt = (TEX[tipo] ? matTex(tipo, raio / 6, raio / 12, cor) : mat(cor, { roughness: 1 })).clone(); mt.fog = false;
+    const hor = corLinear((MAPA && TEX_CEU[MAPA.id] && CEU_INFO[MAPA.id].hor) || (MAPA && MAPA.fundo) || '#dfe6ea'); mt.color.lerp(hor, Math.min(0.5, Math.max(0.15, (r - 120) / 260)));
+    const m = new THREE.Mesh(geo, mt);
     m.scale.y = 0.35 + Math.random() * 0.3; m.position.set(Math.cos(a) * r, -8, Math.sin(a) * r); m.userData.naoMesclar = true; scene.add(m);
   }
 }
@@ -9186,7 +9190,7 @@ function criarAmbiente(topo, horiz, chao) {
   geo.setAttribute('color', new THREE.Float32BufferAttribute(cores, 3));
   cena.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
   const tc = MAPA && TEX_CEU[MAPA.id]; let geoC = null;
-  if (tc) { geoC = new THREE.SphereGeometry(9.5, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2); const dc = new THREE.Mesh(geoC, new THREE.MeshBasicMaterial({ map: tc, side: THREE.BackSide })); if (domoCeu) dc.rotation.y = domoCeu.rotation.y; cena.add(dc); }
+  if (tc) { geoC = new THREE.SphereGeometry(9.5, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2); { const uv = geoC.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - (1 - uv.getY(i)) * 0.5); } const dc = new THREE.Mesh(geoC, new THREE.MeshBasicMaterial({ map: tc, side: THREE.BackSide })); if (domoCeu) dc.rotation.y = domoCeu.rotation.y; cena.add(dc); }
   const solM = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(14, 12, 9) })); solM.position.copy(SOL_DIR).normalize().multiplyScalar(9); cena.add(solM);
   if (scene.environment) scene.environment.dispose();
   const rt = pm.fromScene(cena, 0.03); scene.environment = rt.texture; pm.dispose(); geo.dispose(); if (geoC) geoC.dispose();
@@ -9264,7 +9268,7 @@ function carregarMapa(id) {
   criarAmbiente('#' + new THREE.Color(m.hemi[0]).getHexString(), m.fundo, '#' + new THREE.Color(m.hemi[1]).getHexString()); sombraSegue(new THREE.Vector3());
   const antes = new Set(scene.children);
   ceuFoto(id);
-  const chao = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), matTex(m.chao, 420 / (ESCALA_TEX[m.chao] || 5), 420 / (ESCALA_TEX[m.chao] || 5), TEX_NOR[m.chao] ? m.chaoCor : undefined));
+  const chao = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), matTex(m.chao, 1400 / (ESCALA_TEX[m.chao] || 5), 1400 / (ESCALA_TEX[m.chao] || 5), TEX_NOR[m.chao] ? m.chaoCor : undefined));
   chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true; scene.add(chao);
   PISOS.length = 0; LUZES_INT.length = 0;
   ESPELHO = false; m.construir(); ESPELHO = false;
@@ -9854,6 +9858,13 @@ const POSES_ARMA = {
 };
 const MODELO = { pronto: false, carregando: false, gltf: null, escala: 1, ombroY: 1.42, mats: {}, velAndar: 1.45, velCorrer: 3.9 };
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion(), _va = new THREE.Vector3(), _vb = new THREE.Vector3(), _vc = new THREE.Vector3(), _vd = new THREE.Vector3(), _ve = new THREE.Vector3(), EIXO_Y = new THREE.Vector3(0, 1, 0);
+// O AnimationMixer só reescreve um osso quando o valor do clipe muda; sem isso os ajustes procedurais se acumulariam a cada quadro.
+// Por isso guardamos a pose "limpa" logo depois do mixer e a restauramos antes do próximo quadro.
+function salvarPose(O, dest) {
+  if (!dest) { dest = []; for (const o of Object.values(O)) dest.push([o, o.quaternion.clone(), o.position.clone(), o.scale.clone()]); return dest; }
+  for (const e of dest) { e[1].copy(e[0].quaternion); e[2].copy(e[0].position); e[3].copy(e[0].scale); } return dest;
+}
+function restaurarPose(p) { if (p) for (const e of p) { e[0].quaternion.copy(e[1]); e[0].position.copy(e[2]); e[0].scale.copy(e[3]); } }
 function girarOssoMundo(osso, qMundo) { // aplica uma rotação (em espaço de mundo) ao osso
   osso.parent.getWorldQuaternion(_qb); osso.getWorldQuaternion(_qc);
   _qc.premultiply(qMundo); osso.quaternion.copy(_qb.invert().multiply(_qc)); osso.updateMatrixWorld(true);
@@ -10048,7 +10059,7 @@ class Soldado {
       if (p.acts.idle) p.acts.idle.setEffectiveWeight(wIdle);
       if (p.acts.walk) { p.acts.walk.setEffectiveWeight(wWalk); p.acts.walk.timeScale = sinal * Math.max(0.5, Math.min(1.6, v / MODELO.velAndar)) * (noAr ? 0.2 : 1); }
       if (p.acts.run) { p.acts.run.setEffectiveWeight(wRun); p.acts.run.timeScale = sinal * Math.max(0.7, v / MODELO.velCorrer) * (noAr ? 0.2 : 1); }
-      p.mixer.update(dtA);
+      restaurarPose(p.limpo); p.mixer.update(dtA); p.limpo = salvarPose(O, p.limpo);
       // agachar: corpo desce, coxas sobem, canelas voltam
       p.agacha += ((this.agachado ? 1 : 0) - p.agacha) * Math.min(1, dtA * 10);
       const k = p.agacha; p.modelo.position.y = -MODELO.pisoY - 0.42 * k;
@@ -10107,7 +10118,7 @@ class Soldado {
       if (t - dtA <= 0.001 || !p.morreu) { p.morreu = true; p.acts.idle && p.acts.idle.setEffectiveWeight(1); p.acts.walk && p.acts.walk.setEffectiveWeight(0); p.acts.run && p.acts.run.setEffectiveWeight(0); }
       if (t < 1.2 && O.LeftArm && O.RightArm) { O.LeftArm.getWorldPosition(_vd); O.RightArm.getWorldPosition(_ve); _vd.add(_ve).multiplyScalar(0.5); g.worldToLocal(_vd); p.peito.position.set(_vd.x, _vd.y - 0.42, _vd.z); }
       if (t < 1.2) {
-        p.mixer.update(0);
+        restaurarPose(p.limpo); p.mixer.update(0); p.limpo = salvarPose(O, p.limpo);
         p.modelo.position.y = -MODELO.pisoY - 0.3 * dobra * (1 - e);
         for (const perna of ['Left', 'Right']) if (O[perna + 'UpLeg']) { girarOssoEixo(O[perna + 'UpLeg'], direita, (dirM > 0 ? 0.9 : 0.3) * dobra * (1 - 0.5 * e)); girarOssoEixo(O[perna + 'Leg'], direita, -1.3 * dobra * (1 - 0.6 * e)); }
         for (const n of ['Spine', 'Spine1']) if (O[n]) girarOssoEixo(O[n], direita, dirM * 0.18 * e);
@@ -11314,7 +11325,7 @@ function prepararBracosFP() {
   if (O.LeftArm && O.RightArm) { const lin = O.RightArm.getWorldPosition(new THREE.Vector3()).sub(O.LeftArm.getWorldPosition(new THREE.Vector3())); m.rotation.y = Math.atan2(lin.z, lin.x); m.updateMatrixWorld(true); } // ombros paralelos à tela
   const om = O.LeftArm && O.RightArm ? O.LeftArm.getWorldPosition(new THREE.Vector3()).add(O.RightArm.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5) : new THREE.Vector3(0, 1.45, 0);
   m.position.set(-om.x, -0.45 - om.y, -0.2 - om.z); // ombros 45 cm abaixo e 20 cm à frente dos olhos: tronco e cabeça ficam fora do quadro
-  camera.add(m); Object.assign(bracosFP, { obj: m, time: jogador.time, O, mix });
+  camera.add(m); Object.assign(bracosFP, { obj: m, time: jogador.time, O, mix, pose: salvarPose(O) });
 }
 // fecha os dedos em volta da empunhadura: cada falange gira no eixo que cruza os nós dos dedos (indicador → mínimo)
 function fecharDedos(O, lado, ang) {
@@ -11325,7 +11336,7 @@ function fecharDedos(O, lado, ang) {
 function atualizarBracosFP() {
   const b = bracosFP, O = b.O; if (!b.obj) return;
   const vis = armaVisual.visible && jogador && jogador.vivo && b.alvoD; b.obj.visible = !!vis; if (!vis) return;
-  b.mix.update(0); if (O.Neck) O.Neck.scale.setScalar(0.001);
+  restaurarPose(b.pose); if (O.Neck) O.Neck.scale.setScalar(0.001);
   camera.updateMatrixWorld(true); armaVisual.updateMatrixWorld(true);
   const qA = armaVisual.getWorldQuaternion(new THREE.Quaternion()), fA = new THREE.Vector3(0, 0, -1).applyQuaternion(qA), bA = new THREE.Vector3(0, -1, 0).applyQuaternion(qA), dA = new THREE.Vector3(1, 0, 0).applyQuaternion(qA);
   const lado = (braco, ante, mao, dedo, alvoLocal, s) => {
