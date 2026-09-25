@@ -215,9 +215,10 @@
   <p class="soPc">Clique no jogo para travar o mouse. <kbd>Esc</kbd> solta.</p>
   <p class="soMobile" hidden>Celular: joystick à esquerda para andar, arraste à direita para mirar. Use na horizontal.</p>
   <div class="teclas">
-    <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Shift</kbd> andar devagar</div>
+    <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Shift</kbd> correr · <kbd>Z</kbd> andar em silêncio</div>
     <div><kbd>Espaço</kbd> pular · <kbd>Ctrl</kbd> agachar</div>
     <div>Mouse esq. atirar (minigun gira antes) · Type 95 atira em rajada de 3</div>
+    <div>Botão direito: mirar (segurar) · luneta nas snipers · <kbd>F</kbd> lanterna</div>
     <div><kbd>R</kbd> recarregar · <kbd>1</kbd>-<kbd>4</kbd> armas · roda do mouse</div>
     <div><kbd>B</kbd> comprar · <kbd>Tab</kbd> placar</div>
     <div><kbd>E</kbd> plantar/desarmar bomba · <kbd>G</kbd> largar arma</div>
@@ -4394,6 +4395,7 @@ function criarPoeira() {
 function atualizarPoeira(dt) {
   for (const p of poeira) {
     p.sp.position.x += (p.vx + Math.sin(tempo * 0.7 + p.fase) * 0.2) * dt; p.sp.position.y += (p.vy + Math.cos(tempo * 0.5 + p.fase) * 0.1) * dt;
+    if (p.c) { const dx = p.sp.position.x - p.c.x, dz = p.sp.position.z - p.c.z; if (Math.hypot(dx, dz) > p.r) { p.vx = -Math.sign(dx) * Math.abs(p.vx); p.sp.position.x -= dx * 0.02; p.sp.position.z -= dz * 0.02; } if (p.sp.position.y < p.c.y - 3 || p.sp.position.y > p.c.y) p.vy = -p.vy; continue; }
     if (p.sp.position.y < 0.2 || p.sp.position.y > 4) p.vy = -p.vy; if (Math.abs(p.sp.position.x) > 68) p.vx = -p.vx;
   }
 }
@@ -4581,7 +4583,16 @@ function tabelaBasquete(x, z, rot) {
   const braco = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.8), mat('#444')); braco.position.set(0, 3.3, 0.35); g.add(braco);
   colocar(g, x, 0, z, rot); solido(x - 0.12, z - 0.12, x + 0.12, z + 0.12, 0, 3.6, false);
 }
-function luzInterna(x, y, z, alc = 12, cor = 0xfff1d6, int = 0.7) { const l = new THREE.PointLight(cor, int, alc, 2); l.position.set(ex(x), y, ex(z)); scene.add(l); }
+const LUZES_INT = [];
+function luzInterna(x, y, z, alc = 12, cor = 0xfff1d6, int = 0.7) { const l = new THREE.PointLight(cor, int, alc, 2); l.position.set(ex(x), y, ex(z)); scene.add(l); LUZES_INT.push(l.position.clone()); }
+function poeiraInterna() {
+  const tex = spriteSuave('rgba(255,240,215,A)', 0.4);
+  for (const c of LUZES_INT) for (let i = 0; i < (MOBILE ? 5 : 12); i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.3, depthWrite: false }));
+    sp.position.set(c.x + (Math.random() - 0.5) * 7, Math.max(0.4, c.y - 2.4) + Math.random() * 2.2, c.z + (Math.random() - 0.5) * 7); sp.scale.setScalar(0.04 + Math.random() * 0.05);
+    scene.add(sp); poeira.push({ sp, vx: (Math.random() - 0.5) * 0.08, vy: (Math.random() - 0.5) * 0.05, fase: Math.random() * 6, c, r: 3.5 });
+  }
+}
 function colinas(cor, n = 14, dist = 170) { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + Math.random() * 0.3, r = dist + Math.random() * 60; const m = new THREE.Mesh(new THREE.SphereGeometry(40 + Math.random() * 50, 10, 7), mat(cor, { roughness: 1, flatShading: true })); m.scale.y = 0.35 + Math.random() * 0.3; m.position.set(Math.cos(a) * r, -8, Math.sin(a) * r); scene.add(m); } }
 
 // ---- esquadrias: moldura + vidro (o vidro não bloqueia tiro nem passagem) ----
@@ -4964,9 +4975,9 @@ function carregarMapa(id) {
   const antes = new Set(scene.children);
   const chao = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), matTex(m.chao, 420 / (ESCALA_TEX[m.chao] || 5), 420 / (ESCALA_TEX[m.chao] || 5), TEX_NOR[m.chao] ? m.chaoCor : undefined));
   chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true; scene.add(chao);
-  PISOS.length = 0;
+  PISOS.length = 0; LUZES_INT.length = 0;
   ESPELHO = false; m.construir(); ESPELHO = false;
-  if (!LEVE) sujeiraParedes();
+  if (!LEVE) { sujeiraParedes(); poeiraInterna(); }
   objsMapa = scene.children.filter(o => !antes.has(o));
   construirNav();
   const nCapim = LEVE ? 0.3 : ALTA ? 1.4 : 1;
@@ -5246,14 +5257,24 @@ const dentroZona = (p, z) => p.x >= z.x1 && p.x <= z.x2 && p.z >= z.z1 && p.z <=
 let audio = null;
 function iniciarAudio() { if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (audio && audio.state === 'suspended') audio.resume(); }
 function ruido(dur) { const sr = audio.sampleRate, buf = audio.createBuffer(1, sr * dur, sr), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return buf; }
-function somTiro(tipo, vol = 1, pan = 0, abafado = false, eco = false) {
+function nodo3D(pos) {
+  const p = audio.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'linear'; p.rolloffFactor = 0; p.refDistance = 1; p.maxDistance = 10000;
+  if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z; } else p.setPosition(pos.x, pos.y, pos.z); return p;
+}
+const _fw = new THREE.Vector3(), _up = new THREE.Vector3();
+function atualizarOuvinte() {
+  if (!audio || !audio.listener) return; const L = audio.listener, p = camera.position; _fw.set(0, 0, -1).applyQuaternion(camera.quaternion); _up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  if (L.positionX) { L.positionX.value = p.x; L.positionY.value = p.y; L.positionZ.value = p.z; L.forwardX.value = _fw.x; L.forwardY.value = _fw.y; L.forwardZ.value = _fw.z; L.upX.value = _up.x; L.upY.value = _up.y; L.upZ.value = _up.z; }
+  else { L.setPosition(p.x, p.y, p.z); L.setOrientation(_fw.x, _fw.y, _fw.z, _up.x, _up.y, _up.z); }
+}
+function somTiro(tipo, vol = 1, pan = 0, abafado = false, eco = false, pos = null) {
   if (!audio) return; if (abafado) vol *= 0.7;
   const t = audio.currentTime;
   const cfg = { pistola: [0.09, 1800, 0.5], smg: [0.06, 2200, 0.4], fuzil: [0.11, 1400, 0.7], sniper: [0.22, 900, 1.0], escopeta: [0.18, 700, 1.0], mg: [0.07, 1600, 0.6], lancador: [0.4, 600, 1.0], faca: [0.05, 3000, 0.15] }[tipo] || [0.1, 1500, 0.6];
   const src = audio.createBufferSource(); src.buffer = ruido(cfg[0]);
   const bp = audio.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = cfg[1] * (abafado ? 0.3 : 1);
   const g = audio.createGain(); g.gain.setValueAtTime(0.6 * cfg[2] * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + cfg[0]);
-  const p = audio.createStereoPanner ? audio.createStereoPanner() : null; if (p) p.pan.value = pan;
+  const p = pos ? nodo3D(pos) : audio.createStereoPanner ? audio.createStereoPanner() : null; if (p && !pos) p.pan.value = pan;
   src.connect(bp); bp.connect(g); if (p) { g.connect(p); p.connect(audio.destination); } else g.connect(audio.destination);
   if (eco) { const dl = audio.createDelay(1), fb = audio.createGain(), lp = audio.createBiquadFilter(); dl.delayTime.value = 0.16 + Math.random() * 0.08; fb.gain.value = 0.28; lp.type = 'lowpass'; lp.frequency.value = 900; g.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(audio.destination); setTimeout(() => { try { g.disconnect(dl); } catch (e) {} }, 1200); }
   src.start(t);
@@ -5279,13 +5300,13 @@ function somExplosao(vol = 1) {
 const somRecarga = () => { somTom(900, 0.05, 0.15); setTimeout(() => somTom(600, 0.06, 0.15), 180); };
 const somHit = (cabeca) => somTom(cabeca ? 2200 : 1400, cabeca ? 0.09 : 0.05, 0.22, 'triangle');
 const somClique = () => somTom(900, 0.03, 0.12, 'square');
-const somPasso = (vol = 0.08, pan = 0) => { if (!audio) return; const t = audio.currentTime, s = audio.createBufferSource(); s.buffer = ruido(0.04); const g = audio.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.04); const lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; s.connect(lp); lp.connect(g); const p = audio.createStereoPanner ? audio.createStereoPanner() : null; if (p) { p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); p.connect(audio.destination); } else g.connect(audio.destination); s.start(t); };
+const somPasso = (vol = 0.08, pan = 0, pos = null) => { if (!audio) return; const t = audio.currentTime, s = audio.createBufferSource(); s.buffer = ruido(0.04); const g = audio.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.04); const lp = audio.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; s.connect(lp); lp.connect(g); const p = pos ? nodo3D(pos) : audio.createStereoPanner ? audio.createStereoPanner() : null; if (p) { if (!pos) p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); p.connect(audio.destination); } else g.connect(audio.destination); s.start(t); };
 // grunhido de dor de quem leva tiro (mais forte no fogo amigo)
 function somDor(pos, forte = false) { // "AI!"/"OUCH": voz sintética (vogal A→U com formantes) e um "tch" no fim
   if (!audio || !jogador) return; const d = pos.distanceTo(jogador.olho); if (d > 35) return;
   const v = (forte ? 0.9 : 0.4) * Math.max(0.15, 1 - d / 35), t = audio.currentTime, dur = forte ? 0.5 : 0.38;
   const saida = audio.createGain(); saida.gain.setValueAtTime(0.0001, t); saida.gain.exponentialRampToValueAtTime(v, t + 0.03); saida.gain.setValueAtTime(v, t + dur * 0.45); saida.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  const p = audio.createStereoPanner ? audio.createStereoPanner() : null; if (p) { p.pan.value = Math.max(-1, Math.min(1, panPara(pos))); saida.connect(p); p.connect(audio.destination); } else saida.connect(audio.destination);
+  const p = nodo3D(pos); saida.connect(p); p.connect(audio.destination);
   const f0 = forte ? 190 : 150;
   for (const [f1a, f1b, f2a, f2b, ganho] of [[780, 380, 1250, 850, 1], [780, 380, 1250, 850, 0]]) { // duas cópias levemente desafinadas dão corpo
     const o = audio.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f0 * (ganho ? 1 : 1.01), t); o.frequency.exponentialRampToValueAtTime(f0 * 0.62, t + dur);
@@ -5750,13 +5771,15 @@ class Soldado {
     else this.cooldown = 1 / a.cadencia;
     this.protegidoAte = 0; this.tiros++;
     this.tirosSeguidos = Math.min(this.tirosSeguidos + 1, 8); this.ultimoTiro = tempo;
-    if (this.ehJogador) { recuoVisual(a.recuo); const kp = a.recuo * 0.5, ky = (Math.random() - 0.5) * a.recuo * 0.35; this.pitch += kp; this.yaw += ky; this.chutePitch = (this.chutePitch || 0) + kp; this.chuteYaw = (this.chuteYaw || 0) + ky; if (a.tipo !== 'faca' && a.tipo !== 'lancador') capsula(); }
+    if (this.ehJogador) { recuoVisual(a.recuo * (this.mirando ? 0.6 : 1)); const n = this.tirosSeguidos, base = a.recuo * (n <= 1 ? 1.6 : 1) * (this.mirando ? 0.7 : 1) * (this.agachado ? 0.8 : 1); const kp = base * 0.5, ky = n > 3 ? Math.sin(n * 1.25 + (this.fasePadrao || 0)) * a.recuo * 0.45 : (Math.random() - 0.5) * a.recuo * 0.2; this.pitch += kp; this.yaw += ky; this.chutePitch = (this.chutePitch || 0) + kp; this.chuteYaw = (this.chuteYaw || 0) + ky; if (a.tipo !== 'faca' && a.tipo !== 'lancador') capsula(); }
     else { this.ia.ultimoTiroSom = tempo; this.flashBot = 0.05; }
     const olho = this.olho, frente = this.frente();
     const dir = new THREE.Vector3();
     const velH = Math.hypot(this.vel.x, this.vel.z);
     let spread = a.spread;
     if (a.zoom) spread = this.zoom ? a.spread : a.spreadSemZoom;
+    else if (this.mirando) spread *= 0.55;
+    if (this.correndo) spread *= 1.6;
     spread *= 1 + velH * 0.25 + this.tirosSeguidos * 0.18; if (this.agachado) spread *= 0.7; if (!this.noChao) spread *= 3;
     if (!this.ehJogador) spread *= 1.3 / Math.sqrt(dificuldade); // fácil 1.68 · normal 1.3 · difícil 1.06
     if (a.tipo === 'lancador') {
@@ -5800,7 +5823,7 @@ class Soldado {
     if (cliente) { try { REDE.conn.send({ t: 'tiro', arma: chave, alvos: alvosRede, sen: senRede }); } catch (e) {} }
     const somOk = a.tipo !== 'mg' || (mun.pente % 2 === 0);
     if (this.ehJogador) { if (somOk) somTiro(a.tipo, 1, 0); }
-    else if (somOk) { const d = this.pos.distanceTo(jogador.pos); const pan = Math.max(-1, Math.min(1, panPara(this.pos))); if (d < 70) somTiro(a.tipo, Math.max(0.05, 1 - d / 70) * 0.8, pan, !temVisao(jogador.olho, this.olho, 80), d > 25); }
+    else if (somOk) { const d = this.pos.distanceTo(jogador.pos); const pan = Math.max(-1, Math.min(1, panPara(this.pos))); if (d < 70) somTiro(a.tipo, Math.max(0.05, 1 - d / 70) * 0.8, pan, !temVisao(jogador.olho, this.olho, 80), d > 25, this.olho); }
     if (this.ehJogador) flashCano();
     return true;
   }
@@ -6665,6 +6688,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Digit5') lancarGranada(jogador, 'flash');
   if (e.code === 'Digit6') lancarGranada(jogador, 'fumaca');
   if (e.code === 'KeyG') jogador.largarPrimaria();
+  if (e.code === 'KeyF') alternarLanterna();
   if (e.code === 'KeyQ') jogador.trocar(jogador.atual === 1 ? 2 : 1);
   if (e.code === 'Escape') { if (compraAberta || !$('placar').hidden) fecharMenus(); else alternarPausa(); }
   if (e.code === 'BracketLeft') ajustarSens(-0.1); if (e.code === 'BracketRight') ajustarSens(0.1);
@@ -6675,10 +6699,10 @@ canvas.addEventListener('mousedown', e => {
   iniciarAudio(); canvas.focus();
   if (!travado && !MOBILE && !pausaAberta) { travarMouse(); if (tentouTravar === 0) { tentouTravar = tempo || 0.001; return; } }
   if (e.button === 0) mouseBotao = true;
-  if (e.button === 2 && jogador && jogador.arma.zoom) { jogador.zoom = !jogador.zoom; }
+  if (e.button === 2 && jogador) { if (jogador.arma.zoom) jogador.zoom = !jogador.zoom; else jogador.mirando = true; }
 });
 canvas.tabIndex = 0;
-addEventListener('mouseup', e => { if (e.button === 0) mouseBotao = false; });
+addEventListener('mouseup', e => { if (e.button === 0) mouseBotao = false; if (e.button === 2 && jogador) jogador.mirando = false; });
 addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('pointerlockchange', () => { travado = document.pointerLockElement === canvas; if (!travado) mouseBotao = false; if (travado && (compraAberta || !$('placar').hidden)) document.exitPointerLock(); });
 document.addEventListener('pointerlockerror', () => { travado = false; });
@@ -6689,7 +6713,7 @@ addEventListener('mousemove', e => {
   if (!travado) { // sem trava do mouse (ex.: bloqueada pelo navegador): mira pelo movimento do cursor enquanto nenhum menu está aberto
     if (compraAberta || !$('placar').hidden || !$('inicio').hidden || !$('fim').hidden || partida.estado === 'inicio' || partida.estado === 'encerrada') return;
   }
-  const sens = 0.0022 * sensibilidade * (jogador.zoom ? 0.35 : 1);
+  const sens = 0.0022 * sensibilidade * (jogador.zoom ? 0.35 : jogador.mirando ? 0.75 : 1);
   jogador.yaw -= e.movementX * sens; jogador.pitch -= e.movementY * sens * (invY ? -1 : 1);
   jogador.pitch = Math.max(-1.5, Math.min(1.5, jogador.pitch));
 });
@@ -6717,7 +6741,11 @@ function atualizarJogador(dt) {
   if (teclas.KeyW) mv.add(f); if (teclas.KeyS) mv.sub(f); if (teclas.KeyD) mv.add(lado); if (teclas.KeyA) mv.sub(lado);
   if (MOBILE) { mv.addScaledVector(f, -touchMove.y); mv.addScaledVector(lado, touchMove.x); }
   if (gp.ativo) { mv.addScaledVector(f, -gp.ly); mv.addScaledVector(lado, gp.lx); }
-  let vel = j.agachado ? CFG.velAgachado : ((teclas.ShiftLeft || gp.andar) ? CFG.velAndar : CFG.velCorrida);
+  const paraFrente = teclas.KeyW || (MOBILE && touchMove.y < -0.6) || (gp.ativo && gp.ly < -0.6);
+  j.correndo = !!((teclas.ShiftLeft || teclas.ShiftRight || gp.andar) && paraFrente && !j.agachado && !j.mirando && !j.zoom && !(mouseBotao || gp.fogo) && j.recarregando <= 0);
+  if (j.correndo) j.mirando = false;
+  let vel = j.agachado ? CFG.velAgachado : teclas.KeyZ ? CFG.velAndar : j.correndo ? CFG.velCorrida * 1.3 : CFG.velCorrida;
+  if (j.mirando) vel *= 0.65;
   if (j.zoom) vel *= 0.6;
   vel *= j.arma.peso || 1; if (j.giroMg > 0) vel *= 0.6;
   if (mv.lengthSq() > 0) { const mag = (MOBILE || gp.ativo) ? Math.min(1, mv.length()) : 1; mv.normalize().multiplyScalar(vel * mag); }
@@ -6732,7 +6760,7 @@ function atualizarJogador(dt) {
   // passos
   const velH = Math.hypot(j.vel.x, j.vel.z);
   j.passo = (j.passo || 0) + velH * dt;
-  if (j.passo > 2.2 && j.noChao && !teclas.ShiftLeft) { j.passo = 0; somPasso(); }
+  if (j.passo > (j.correndo ? 2.6 : 2.2) && j.noChao && !teclas.KeyZ) { j.passo = 0; somPasso(j.correndo ? 0.11 : 0.08); }
   const querAtirar = mouseBotao || gp.fogo;
   if (querAtirar && (j.arma.auto || !j.travaTiro)) { if (j.atirar()) j.travaTiro = !j.arma.auto; else if (j.arma.giro) j.querGiro = tempo; }
   if (!querAtirar) j.travaTiro = false;
@@ -6817,6 +6845,8 @@ function construirArmaVisual() {
   partesArma.flash = flash; partesArma.chave = jogador.chaveArma;
   g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 10; } });
 }
+const lanterna = new THREE.SpotLight(0xfff2dd, 0, 32, 0.45, 0.5, 1.5); lanterna.position.set(0.25, -0.15, 0); lanterna.target.position.set(0.1, -0.1, -5); camera.add(lanterna); camera.add(lanterna.target);
+function alternarLanterna() { lanterna.intensity = lanterna.intensity > 0 ? 0 : 2.4; somTom(lanterna.intensity ? 1600 : 1200, 0.03, 0.1, 'square'); }
 const luzCano = new THREE.PointLight(0xffc070, 0, 7, 2); luzCano.position.set(0.2, -0.1, -0.8); camera.add(luzCano);
 function recuoVisual(r) { recuoV = Math.min(0.25, recuoV + r * 3); }
 const matCapsula = new THREE.MeshBasicMaterial({ color: corLinear('#d9b34a') });
@@ -6854,7 +6884,8 @@ function atualizarCamera(dt) {
   tremor = Math.max(0, tremor - dt * 2);
   const swayZoom = j.zoom ? (j.agachado ? 0.0012 : 0.004) * (1 + velH * 0.6) : 0;
   camera.rotation.set(j.pitch + (Math.random() - 0.5) * tremor * 0.05 + Math.sin(tempo * 1.7) * swayZoom, j.yaw + (Math.random() - 0.5) * tremor * 0.05 + Math.cos(tempo * 1.1) * swayZoom, 0);
-  const fovAlvo = j.zoom && j.arma.zoom ? j.arma.zoom : fovBase;
+  j.adsK = (j.adsK || 0) + ((j.mirando && !j.zoom ? 1 : 0) - (j.adsK || 0)) * Math.min(1, dt * 12); j.sprK = (j.sprK || 0) + ((j.correndo ? 1 : 0) - (j.sprK || 0)) * Math.min(1, dt * 9);
+  const fovAlvo = j.zoom && j.arma.zoom ? j.arma.zoom : fovBase * (1 - 0.2 * j.adsK) + 7 * j.sprK;
   camera.fov += (fovAlvo - camera.fov) * Math.min(1, dt * 12); camera.updateProjectionMatrix();
   // modelo da arma
   armaVisual.visible = !j.zoom;
@@ -6864,10 +6895,12 @@ function atualizarCamera(dt) {
   const troca = j.trocando > 0 ? Math.min(1, j.trocando / 0.45) : 0;
   pouso = Math.max(0, pouso - dt * 0.5);
   camera.position.y -= pouso;
-  armaVisual.position.set(0.22 + Math.sin(balanco * 0.5) * 0.01 * Math.min(1, velH / 3) + rec * 0.05, -0.2 - rec * 0.14 - troca * 0.45 + Math.abs(bob) * 0.5 - pouso, -0.4 + recuoV * 0.5);
+  const ak = j.adsK, sk = j.sprK;
+  armaVisual.position.set((0.22 + Math.sin(balanco * 0.5) * 0.01 * Math.min(1, velH / 3)) * (1 - ak) + rec * 0.05 + sk * 0.04, -0.2 + 0.075 * ak - rec * 0.14 - troca * 0.45 + Math.abs(bob) * 0.5 * (1 - 0.7 * ak) - pouso - sk * 0.05, -0.4 + 0.07 * ak + recuoV * 0.5 * (1 - 0.4 * ak));
   const respira = Math.sin(tempo * 1.3) * 0.004, respira2 = Math.cos(tempo * 0.9) * 0.003;
   armaVisual.position.x += respira; armaVisual.position.y += respira2;
-  armaVisual.rotation.set(-recuoV * 1.4 + rec * 0.55 + troca * 0.8 + respira2 * 2, 0.04 + rec * 0.35 + respira * 2, rec * 0.25);
+  armaVisual.rotation.set(-recuoV * 1.4 * (1 - 0.4 * ak) + rec * 0.55 + troca * 0.8 + respira2 * 2 * (1 - ak) - sk * 0.35, (0.04 + respira * 2) * (1 - ak) + rec * 0.35 + sk * 0.7, rec * 0.25 + sk * 0.25);
+  $('mira').style.visibility = ak > 0.5 || sk > 0.5 ? 'hidden' : '';
   flashTimer -= dt; if (flashTimer <= 0 && partesArma.flash) partesArma.flash.visible = false;
   luzCano.intensity = Math.max(0, luzCano.intensity - dt * 40);
   if (partesArma.info) { const inf = partesArma.info; if (inf.canos) inf.canos.rotation.z += (j.giroMg || 0) / (j.arma.giro || 1) * 45 * dt; if (inf.foguete) inf.foguete.visible = partesArma.mun && partesArma.mun.pente > 0; }
@@ -7202,11 +7235,17 @@ function atualizarHUD() {
   $('mira').style.transform = 'scale(' + (1 + Math.hypot(j.vel.x, j.vel.z) * 0.12 + j.tirosSeguidos * 0.15 + (j.noChao ? 0 : 0.8)) + ')';
   $('mira').style.opacity = j.zoom || !j.vivo ? 0 : 1;
 }
+function efeitoVidaBaixa() {
+  const j = jogador, k = j && j.vivo && j.hp < 40 ? (40 - Math.max(0, j.hp)) / 40 : 0, pulso = 0.5 + 0.5 * Math.sin(tempo * (5 + 4 * k));
+  if (POS.cor) { const u = POS.cor.uniforms; u.sat.value = 1.08 - 0.85 * k; u.vinheta.value = 0.35 + 0.5 * k * (0.7 + 0.3 * pulso); }
+  else canvas.style.filter = k > 0 ? 'grayscale(' + (k * 0.8).toFixed(2) + ')' : '';
+  return k * (0.25 + 0.2 * pulso);
+}
 function atualizarOverlays(dt) {
   avisoTimer -= dt; subavisoTimer -= dt; danoTimer -= dt; hitTimer -= dt; flashTela = Math.max(0, flashTela - dt);
   $('aviso').style.opacity = Math.max(0, Math.min(1, avisoTimer));
   $('subaviso').style.opacity = Math.max(0, Math.min(1, subavisoTimer));
-  $('dano').style.opacity = Math.max(0, danoTimer / 0.35);
+  $('dano').style.opacity = Math.max(0, danoTimer / 0.35, efeitoVidaBaixa());
   $('hitmark').style.opacity = hitTimer > 0 ? 1 : 0;
   danoDirTimer -= dt; if (danoDirTimer <= 0) $('danoDir').style.opacity = 0;
   const fl = Math.max(jogador.flash > 0 ? Math.min(1, jogador.flash / 2) : 0, Math.min(1, flashTela / 2));
@@ -7223,7 +7262,8 @@ function desenharRadar() {
   c.font = 'bold 10px sans-serif';
   if (partida.modo === 'bomba') for (const s of SITES) { c.fillStyle = 'rgba(255,138,60,.35)'; c.fillRect(px(s.x1), pz(s.z1), (s.x2 - s.x1) * esc, (s.z2 - s.z1) * esc); c.fillStyle = '#ff8a3c'; c.fillText(s.nome, px((s.x1 + s.x2) / 2) - 3, pz((s.z1 + s.z2) / 2) + 4); }
   if (partida.modo === 'dom') for (const b of BANDEIRAS) { c.fillStyle = corTime(b.dono); c.globalAlpha = b.contestada ? 0.5 + Math.sin(tempo * 10) * 0.4 : 0.9; c.beginPath(); c.arc(px(b.x), pz(b.z), 6, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; c.fillStyle = '#000'; c.fillText(b.nome, px(b.x) - 3, pz(b.z) + 4); }
-  if (bomba.estado === 'plantada' || bomba.chao) { const p = bomba.estado === 'plantada' ? bomba.pos : bomba.chao.pos; c.fillStyle = '#ff3030'; c.beginPath(); c.arc(px(p.x), pz(p.z), 3.5, 0, Math.PI * 2); c.fill(); }
+  const estrela = (x, y, r) => { c.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); c.fillStyle = '#ffd700'; c.fill(); c.strokeStyle = '#6b4a00'; c.lineWidth = 1; c.stroke(); };
+  if (bomba.estado === 'plantada' || bomba.chao) { const p = bomba.estado === 'plantada' ? bomba.pos : bomba.chao.pos; estrela(px(p.x), pz(p.z), bomba.estado === 'plantada' ? 6 + Math.sin(tempo * 8) : 5.5); }
   for (const s of soldados) {
     if (!s.vivo) continue;
     if (s.time !== jogador.time) {
@@ -7235,7 +7275,7 @@ function desenharRadar() {
     c.fillStyle = s.ehJogador ? '#ffffff' : (s.time === 't' ? '#e0a640' : '#5fa8ff');
     c.save(); c.translate(px(s.pos.x), pz(s.pos.z)); c.rotate(-s.yaw);
     c.beginPath(); c.moveTo(0, -5); c.lineTo(3.5, 3.5); c.lineTo(-3.5, 3.5); c.closePath(); c.fill(); c.restore();
-    if (s.temBomba) { c.fillStyle = '#ff3030'; c.fillRect(px(s.pos.x) + 3, pz(s.pos.z) - 6, 4, 4); }
+    if (s.temBomba) estrela(px(s.pos.x) + 6, pz(s.pos.z) - 6, 4);
   }
   // VANT ativo: linha de varredura subindo pelo radar
   if (apoio.vant[jogador.time] > tempo) {
@@ -7330,7 +7370,7 @@ function montarPos() {
     const c = new THREE.EffectComposer(renderer); c.addPass(new THREE.RenderPass(scene, camera));
     if (ALTA && THREE.SAOPass) { const sao = new THREE.SAOPass(scene, camera, false, true); Object.assign(sao.params, { saoBias: 0.5, saoIntensity: 0.012, saoScale: 6, saoKernelRadius: 22, saoMinResolution: 0, saoBlur: true, saoBlurRadius: 6, saoBlurStdDev: 3, saoBlurDepthCutoff: 0.01 }); c.addPass(sao); POS.sao = sao; }
     POS.bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.32, 0.45, 0.88); c.addPass(POS.bloom);
-    c.addPass(new THREE.ShaderPass(SHADER_COR));
+    POS.cor = new THREE.ShaderPass(SHADER_COR); c.addPass(POS.cor);
     if (THREE.FXAAShader) { POS.fxaa = new THREE.ShaderPass(THREE.FXAAShader); c.addPass(POS.fxaa); }
     POS.composer = c; ajustarPos();
   } catch (e) { POS.composer = null; }
@@ -7345,6 +7385,7 @@ function loop(agora) {
   const dt = Math.max(0, Math.min(0.05, (agora - ultimo) / 1000)); ultimo = agora;
   passo(dt, agora);
   if (jogador && !LEVE) sombraSegue(camera.position);
+  if (jogador) atualizarOuvinte();
   desenhar();
 }
 // com a aba escondida o navegador para o requestAnimationFrame; no online a simulação continua em passos de 50 ms
@@ -7363,7 +7404,7 @@ function passo(dt, agora) {
       else if (s.remoto) { acaoRemota(s, dt); s.atualizarMesh(dt); if (s.rotulo) s.rotulo.visible = s.time === jogador.time; continue; }
       else {
         atualizarBot(s, dt); moverEntidade(s, dt); const vh = Math.hypot(s.vel.x, s.vel.z); s.tempoParado = vh > 0.5 ? 0 : s.tempoParado;
-        s.passoBot += vh * dt; if (s.passoBot > 2.4 && s.noChao) { s.passoBot = 0; const d = s.pos.distanceTo(jogador.pos); if (MAPA.chao === 'chao' && vh > 3 && d < 30) nuvem(s.pos.clone().add(new THREE.Vector3(0, 0.1, 0)), 1, { tam: 0.35, vida: 0.7, sobe: 0.25, espalha: 0.4, op: 0.35 }); if (d < 22 && jogador.vivo) somPasso(0.12 * (1 - d / 22), panPara(s.pos)); }
+        s.passoBot += vh * dt; if (s.passoBot > 2.4 && s.noChao) { s.passoBot = 0; const d = s.pos.distanceTo(jogador.pos); if (MAPA.chao === 'chao' && vh > 3 && d < 30) nuvem(s.pos.clone().add(new THREE.Vector3(0, 0.1, 0)), 1, { tam: 0.35, vida: 0.7, sobe: 0.25, espalha: 0.4, op: 0.35 }); if (d < 22 && jogador.vivo) somPasso(0.12 * (1 - d / 22), panPara(s.pos), s.pos); }
       }
       s.atualizarMesh(dt);
       if (s.rotulo) { s.rotulo.visible = s.time === jogador.time && s.vivo; }
@@ -7438,7 +7479,7 @@ function iniciarToque() {
   botao('tReload', () => { if (jogador) jogador.recarregar(); });
   botao('tArma', () => { if (!jogador || !jogador.vivo) return; const ordem = [1, 2, 3].filter(k => jogador.armas[k]); const i = ordem.indexOf(jogador.atual); jogador.trocar(ordem[(i + 1) % ordem.length]); });
   botao('tGran', () => { if (!jogador) return; if (jogador.granadas.he) lancarGranada(jogador, 'he'); else if (jogador.granadas.flash) lancarGranada(jogador, 'flash'); else if (jogador.granadas.fumaca) lancarGranada(jogador, 'fumaca'); });
-  botao('tZoom', () => { if (jogador && jogador.arma.zoom) jogador.zoom = !jogador.zoom; });
+  botao('tZoom', () => { if (!jogador) return; if (jogador.arma.zoom) jogador.zoom = !jogador.zoom; else jogador.mirando = !jogador.mirando; $('tZoom').classList.toggle('ativo', !!jogador.mirando); });
   botao('tUse', () => { teclas.KeyE = true; }, () => { teclas.KeyE = false; });
   botao('tBuy', () => alternarCompra());
   botao('tPlacar', () => { const p = $('placar'); p.hidden = !p.hidden; if (!p.hidden) atualizarPlacar(); });
@@ -7492,6 +7533,7 @@ function lerControle(dt) {
     teclas.KeyE = bt[4];
     if (apertou(5) || apertou(13)) { if (jogador.granadas.he) lancarGranada(jogador, 'he'); else if (jogador.granadas.flash) lancarGranada(jogador, 'flash'); else if (jogador.granadas.fumaca) lancarGranada(jogador, 'fumaca'); }
     if (apertou(6) && jogador.arma.zoom) jogador.zoom = !jogador.zoom;
+    if (!jogador.arma.zoom) jogador.mirando = !!bt[6];
     if (apertou(14)) jogador.trocar(1); if (apertou(15)) jogador.trocar(2); if (apertou(12)) jogador.trocar(3);
   }
   if (apertou(9)) { alternarCompra(); gp.compraSel = 0; }
@@ -7518,7 +7560,7 @@ function atualizarLobby(lista) {
   el.hidden = false;
   if (REDE.modo === 'host') $('btnJogar').textContent = lista.length > 1 ? 'INICIAR PARTIDA · ' + lista.length + ' jogadores' : 'INICIAR (aguardando amigos… ou jogue só com bots)';
 }
-const LINK_SITE = 'https://ugororszagh-hub.github.io/operacao-areia/';
+const LINK_SITE = 'https://ugororszagh-hub.github.io/check-six/';
 function erroRede(e, cod) {
   const t = e && e.type;
   if (t === 'browser-incompatible') return 'Este navegador ou esta página não permite conexão direta entre jogadores (WebRTC). Abra o jogo pelo link do site: ' + LINK_SITE;
@@ -7655,7 +7697,7 @@ function efeitoTiroRemoto(s, chave) {
   const a = ARMAS[chave] || ARMAS.p9; if (a.tipo === 'faca') return;
   const olho = s.olho, dir = s.frente(); const t = raioMundo(olho, dir, a.alcance);
   tracador(olho.clone().addScaledVector(dir, 0.8).add(new THREE.Vector3(0, -0.15, 0)), olho.clone().addScaledVector(dir, t));
-  if (jogador) { const d = s.pos.distanceTo(jogador.pos); if (d < 70) somTiro(a.tipo, Math.max(0.05, 1 - d / 70) * 0.8, Math.max(-1, Math.min(1, panPara(s.pos))), !temVisao(jogador.olho, s.olho, 80), d > 25); }
+  if (jogador) { const d = s.pos.distanceTo(jogador.pos); if (d < 70) somTiro(a.tipo, Math.max(0.05, 1 - d / 70) * 0.8, Math.max(-1, Math.min(1, panPara(s.pos))), !temVisao(jogador.olho, s.olho, 80), d > 25, s.olho); }
 }
 function acaoRemota(s, dt) { // plantar/desarmar pelo jogador remoto (segurando E)
   if (partida.modo !== 'bomba' || partida.estado !== 'live' || !s.vivo) { s.progresso = 0; return; }
