@@ -9942,6 +9942,8 @@ function carregarModeloSoldado() {
 }
 const modoLivre = () => partida.modo === 'dm' || partida.modo === 'dom'; // modos com renascimento
 const GOSTOS = ['ak47', 'acr', 'type95', 'mp7', 'ak47', 'acr', 'type95', 'mp5', 'vector', 'pp90', 'scorpion', 'ump45', 'scout', 'barrett', 'awm', 'minigun', 'bazuca'];
+// desliga o som de giro da minigun (senão o zumbido continua depois de o soldado morrer, trocar de arma ou sair da partida)
+function pararGiro(s) { const og = s.oscGiro; if (!og) return; s.oscGiro = null; try { og.g.gain.setTargetAtTime(0, audio.currentTime, 0.05); setTimeout(() => { try { og.o.stop(); } catch (e) {} }, 300); } catch (e) {} }
 class Soldado {
   constructor(nome, time, ehJogador = false) {
     this.nome = nome; this.time = time; this.ehJogador = ehJogador;
@@ -11470,7 +11472,7 @@ const partida = { modo: 'bomba', estado: 'inicio', tempo: 0, rodada: 0, pts: { t
 let tempo = 0;
 function novaPartida(modo, time) {
   partida.modo = modo; partida.timeJogador = time; partida.estado = 'inicio'; partida.rodada = 0; partida.trocou = false; partida.trocarLados = false; partida.pts = { t: 0, ct: 0 }; partida.derrotas = { t: 0, ct: 0 }; partida.fim = false; partida.tempoDM = modo === 'dom' ? CFG.domTempo : CFG.dmTempo;
-  for (const s of soldados) if (s.mesh) scene.remove(s.mesh);
+  for (const s of soldados) { pararGiro(s); if (s.mesh) scene.remove(s.mesh); }
   soldados.length = 0; limparArmasChao(); limparBomba();
   for (const g of granadas) scene.remove(g.mesh); granadas.length = 0;
   document.getElementById('feed').innerHTML = ''; $('resumo').hidden = true;
@@ -11958,6 +11960,7 @@ function passo(dt, agora) {
   if (partida.estado === 'inicio' || partida.estado === 'encerrada') { lerControle(dt); return; }
   if (REDE.modo === 'cliente') { loopCliente(dt); if ((agora | 0) % 4 === 0) desenharRadar(); return; }
   tempo += dt;
+  for (const s of soldados) if (s.oscGiro && (!s.vivo || !s.arma || !s.arma.giro)) pararGiro(s);
   lerControle(dt);
   atualizarPartida(dt);
   if (partida.estado !== 'encerrada') {
@@ -12308,7 +12311,7 @@ function iniciarCliente(d) {
   iniciarAudio();
   carregarMapa(d.mapa); aplicarLado(!!d.lado);
   partida.modo = d.modo; partida.estado = 'live'; partida.pts = { t: 0, ct: 0 }; partida.rodada = 0; partida.tempoDM = 0;
-  for (const s of soldados) if (s.mesh) scene.remove(s.mesh); soldados.length = 0;
+  for (const s of soldados) { pararGiro(s); if (s.mesh) scene.remove(s.mesh); } soldados.length = 0;
   for (const m of [REDE.granadas, REDE.foguetes, REDE.armasChao]) { for (const o of m.values()) scene.remove(o); m.clear(); }
   for (const f of fumacas) scene.remove(f.mesh); fumacas.length = 0; limparBomba(); limparMarcas();
   for (const b of BANDEIRAS) { b.dono = null; b.prog = 0; b.contestada = false; }
