@@ -8262,7 +8262,8 @@ const NOMES_CT = ['Águia', 'Tigre', 'Rocha', 'Norte', 'Cobra'];
 // ====================== CENA ======================
 // Controles: 'auto' detecta; 'pc' força mouse/teclado; 'celular' força toque. PC com tela sensível ao toque era detectado como celular (mouse não travava).
 let CTRL_PREF = 'auto'; try { CTRL_PREF = localStorage.getItem('controles') || 'auto'; } catch (e) {}
-const MOBILE_AUTO = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches && navigator.maxTouchPoints > 0);
+// Só o tipo de aparelho decide: PCs com tela de toque (Windows/Linux/Mac) contam como PC — as consultas de mídia dizem "sem mouse" nesses casos. iPad com UA de Mac: Macintosh + toque.
+const MOBILE_AUTO = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const MOBILE = CTRL_PREF === 'celular' ? true : CTRL_PREF === 'pc' ? false : MOBILE_AUTO;
 if (MOBILE) document.body.classList.add('mobile');
 const canvas = document.getElementById('jogo');
@@ -11170,7 +11171,21 @@ _g('fov2').oninput = () => { fovBase = parseFloat(_g('fov2').value); _g('fovVal'
 _g('invY').onchange = () => { invY = _g('invY').checked; };
 _g('btnContinuar').onclick = () => { if (pausaAberta) alternarPausa(); };
 _g('btnSair').onclick = () => { pausaAberta = false; _g('pausa').hidden = true; fimPartida('Partida encerrada'); };
-function travarMouse() { if (MOBILE) return; try { let p; try { p = canvas.requestPointerLock({ unadjustedMovement: true }); } catch (e2) { p = canvas.requestPointerLock(); } if (p && p.catch) p.catch(() => { try { const q = canvas.requestPointerLock(); if (q && q.catch) q.catch(() => {}); } catch (e3) {} }); } catch (e) {} }
+// Trava do mouse: pedido simples (sem unadjustedMovement, que alguns Windows/drivers rejeitam e o segundo pedido perde o gesto do usuário).
+// Se o navegador recusar, mostra o motivo e, no próximo clique, tenta em tela cheia (onde a trava costuma ser liberada).
+let falhasTrava = 0;
+function travarMouse() {
+  if (MOBILE || document.pointerLockElement === canvas) return;
+  try {
+    const p = canvas.requestPointerLock();
+    if (p && p.catch) p.catch(err => travaFalhou(err && err.name));
+  } catch (e) { travaFalhou(e && e.name); }
+}
+function travaFalhou(nome) { // pode ser chamada duas vezes pelo mesmo pedido (promessa + evento): conta uma só
+  travado = false; const agora = performance.now(); if (agora - (travaFalhou.ultimo || -9e9) < 300) return; travaFalhou.ultimo = agora; falhasTrava++;
+  if (falhasTrava >= 2 && !document.fullscreenElement && document.documentElement.requestFullscreen) { subaviso('Trava do mouse recusada (' + (nome || '?') + '). Clique de novo para tentar em tela cheia.'); return; }
+  subaviso('Trava do mouse recusada' + (nome ? ' (' + nome + ')' : '') + ' · clique no jogo de novo');
+}
 let mouseBotao = false, travado = false, rodaAcum = 0;
 addEventListener('keydown', e => {
   if (e.code === 'Tab') { e.preventDefault(); document.getElementById('placar').hidden = false; atualizarPlacar(); return; }
@@ -11192,7 +11207,7 @@ addEventListener('keyup', e => { teclas[e.code] = false; if (e.code === 'Tab') d
 let tentouTravar = 0;
 canvas.addEventListener('mousedown', e => {
   iniciarAudio(); canvas.focus();
-  if (!travado && !MOBILE && !pausaAberta) { travarMouse(); if (tentouTravar === 0) { tentouTravar = tempo || 0.001; return; } }
+  if (!travado && !MOBILE && !pausaAberta) { if (falhasTrava >= 2 && !document.fullscreenElement && document.documentElement.requestFullscreen) { try { const f = document.documentElement.requestFullscreen(); if (f && f.then) f.then(() => setTimeout(travarMouse, 150), () => travarMouse()); } catch (e) { travarMouse(); } } else travarMouse(); if (tentouTravar === 0) { tentouTravar = tempo || 0.001; return; } }
   if (e.button === 0) mouseBotao = true;
   if (e.button === 2 && jogador && jogador.arma.zoom) jogador.zoom = !jogador.zoom;
 });
@@ -11200,7 +11215,7 @@ canvas.tabIndex = 0;
 addEventListener('mouseup', e => { if (e.button === 0) mouseBotao = false; });
 addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('pointerlockchange', () => { travado = document.pointerLockElement === canvas; if (!travado) mouseBotao = false; if (travado && (compraAberta || !$('placar').hidden)) document.exitPointerLock(); });
-document.addEventListener('pointerlockerror', () => { travado = false; });
+document.addEventListener('pointerlockerror', () => travaFalhou('pointerlockerror'));
 let cursorX = -1, cursorY = -1;
 addEventListener('mousemove', e => {
   cursorX = e.clientX; cursorY = e.clientY;
@@ -11226,6 +11241,7 @@ function atualizarJogador(dt) {
       if (!SOLIDOS.some(b => sobrepoe(min, max, b))) { j.agachado = false; j.alturaAtual = CFG.altura; }
     }
   }
+  canvas.style.cursor = travado || MOBILE || pausaAberta || compraAberta || !$('placar').hidden ? '' : 'none';
   if (!travado && !MOBILE && !pausaAberta && !compraAberta && cursorX >= 0) {
     const bx = innerWidth * 0.06, by = innerHeight * 0.08;
     if (cursorX < bx) j.yaw += dt * 2.2 * sensibilidade * (1 - cursorX / bx); else if (cursorX > innerWidth - bx) j.yaw -= dt * 2.2 * sensibilidade * (1 - (innerWidth - cursorX) / bx);
