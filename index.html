@@ -11350,7 +11350,7 @@ function construirArmaVisual() {
   const flash = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.16), new THREE.MeshBasicMaterial({ color: corLinear('#fff0b0'), transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
   flash.position.set(0, 0.02, pontaCano - 0.06); flash.visible = false; g.add(flash);
   partesArma.flash = flash; partesArma.chave = jogador.chaveArma;
-  g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 10; } });
+  g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 10; o.userData.semSAO = true; o.userData.saoVisto = false; o.layers.disable(2); } });
   // braços realistas: as mãos antigas viram só os alvos (punho = centro da mão um pouco para trás)
   const maos = g.children.filter(o => o.material === mPele).sort((p, q) => q.position.x - p.position.x), mangas = g.children.filter(o => o.material === mManga);
   const ajMao = a.tipo === 'faca' ? (window.AJ_F ? new THREE.Vector3(...window.AJ_F) : new THREE.Vector3(0.03, 0.05, 0.14)) : a.tipo === 'pistola' ? (window.AJ_P ? new THREE.Vector3(...window.AJ_P) : new THREE.Vector3(0.02, 0.035, 0.04)) : new THREE.Vector3(0.0, 0.0, 0.035); // na pistola as mãos sobem na empunhadura
@@ -11371,7 +11371,7 @@ function prepararBracosFP() {
   if (bracosFP.obj) camera.remove(bracosFP.obj);
   const m = THREE.SkeletonUtils.clone(MODELO.gltf.scene); m.scale.multiplyScalar(MODELO.escala);
   const O = {}, mats = MODELO.mats[jogador.time];
-  m.traverse(o => { if (o.isBone) O[o.name.replace(/^mixamorig:?/, '')] = o; if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; o.renderOrder = 10; if (mats[o.material.name]) o.material = mats[o.material.name]; } });
+  m.traverse(o => { if (o.isBone) O[o.name.replace(/^mixamorig:?/, '')] = o; if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; o.renderOrder = 10; o.userData.semSAO = true; if (mats[o.material.name]) o.material = mats[o.material.name]; } });
   const mix = new THREE.AnimationMixer(m), base = MODELO.gltf.animations.find(c => /idle/i.test(c.name)) || MODELO.gltf.animations[0]; if (base) mix.clipAction(base).play(); mix.update(0);
   m.updateMatrixWorld(true);
   if (O.LeftArm && O.RightArm) { const lin = O.RightArm.getWorldPosition(new THREE.Vector3()).sub(O.LeftArm.getWorldPosition(new THREE.Vector3())); m.rotation.y = Math.atan2(lin.z, lin.x); m.updateMatrixWorld(true); } // ombros paralelos à tela
@@ -11930,7 +11930,7 @@ function montarPos() {
   if (LEVE || !THREE.EffectComposer || !THREE.UnrealBloomPass) return;
   try {
     const c = new THREE.EffectComposer(renderer); c.addPass(new THREE.RenderPass(scene, camera));
-    if (ALTA && THREE.SAOPass) { const sao = new THREE.SAOPass(scene, camera, false, true); Object.assign(sao.params, { saoBias: 0.5, saoIntensity: 0.012, saoScale: 6, saoKernelRadius: 22, saoMinResolution: 0, saoBlur: true, saoBlurRadius: 6, saoBlurStdDev: 3, saoBlurDepthCutoff: 0.01 }); c.addPass(sao); POS.sao = sao; }
+    if (ALTA && THREE.SAOPass) { POS.camSAO = new THREE.PerspectiveCamera(); POS.camSAO.layers.set(2); const sao = new THREE.SAOPass(scene, POS.camSAO, false, true); /* a oclusão só vê a camada 2 (objetos opacos): sprites, fumaça, vidro e a arma em 1ª pessoa ficavam como quadrados escuros */ Object.assign(sao.params, { saoBias: 0.5, saoIntensity: 0.012, saoScale: 6, saoKernelRadius: 22, saoMinResolution: 0, saoBlur: true, saoBlurRadius: 6, saoBlurStdDev: 3, saoBlurDepthCutoff: 0.01 }); c.addPass(sao); POS.sao = sao; }
     POS.bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.32, 0.45, 0.88); c.addPass(POS.bloom);
     POS.cor = new THREE.ShaderPass(SHADER_COR); c.addPass(POS.cor);
     if (THREE.FXAAShader) { POS.fxaa = new THREE.ShaderPass(THREE.FXAAShader); c.addPass(POS.fxaa); }
@@ -11938,7 +11938,12 @@ function montarPos() {
   } catch (e) { POS.composer = null; }
 }
 function ajustarPos() { const pr = renderer.getPixelRatio(); POS.composer.setPixelRatio(pr); POS.composer.setSize(innerWidth, innerHeight); if (POS.fxaa) POS.fxaa.material.uniforms.resolution.value.set(1 / (innerWidth * pr), 1 / (innerHeight * pr)); }
-function desenhar() { if (POS.composer) POS.composer.render(); else renderer.render(scene, camera); }
+function prepararSAO() { // câmera da oclusão copia a principal; objetos opacos entram na camada 2 (uma vez cada)
+  const c = POS.camSAO; c.fov = camera.fov; c.aspect = camera.aspect; c.near = camera.near; c.far = camera.far; c.zoom = camera.zoom;
+  c.matrixWorld.copy(camera.matrixWorld); c.matrixWorldInverse.copy(camera.matrixWorldInverse); c.projectionMatrix.copy(camera.projectionMatrix); c.projectionMatrixInverse.copy(camera.projectionMatrixInverse); c.matrixAutoUpdate = false;
+  scene.traverse(o => { if (o.userData.saoVisto || !(o.isMesh || o.isSprite || o.isPoints || o.isLine)) return; o.userData.saoVisto = true; const m = o.material; const opaco = o.isMesh && m && !m.transparent && !(Array.isArray(m) && m.some(x => x.transparent)) && !o.userData.semSAO; if (opaco) o.layers.enable(2); });
+}
+function desenhar() { if (POS.composer) { if (POS.camSAO) prepararSAO(); POS.composer.render(); } else renderer.render(scene, camera); }
 let ultimoRaf = 0;
 function loop(agora) {
   requestAnimationFrame(loop);
