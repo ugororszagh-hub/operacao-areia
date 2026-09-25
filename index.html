@@ -139,7 +139,7 @@
     #inicio .corpo { grid-template-columns:1fr; } #inicio .col + .col { border-left:none; border-top:1px solid var(--ln); }
     #inicio .teclas { columns:1; }
   }
-  @media (max-height:800px) { #inicio .col { padding:14px 20px; gap:14px; } #inicio .cab { padding:12px 20px; } #inicio .op .cx { padding:9px 10px 8px; } #inicio .rod { padding:10px 20px; } }
+  @media (max-height:800px) { #inicio .col { padding:12px 20px; gap:12px; } #inicio .cab { padding:10px 20px; } #inicio .op .cx { padding:8px 10px 7px; } #inicio .rod { padding:8px 20px; } #inicio .campos { gap:6px 12px; } }
   body.mobile #inicio .cab img { height:38px; } body.mobile #inicio .op small { display:none; } body.mobile #inicio .teclas { display:none; }
   .marca-wy6 { font-weight:900; font-size:12px; letter-spacing:1.5px; color:#e06a1b; border:1px solid rgba(224,106,27,.6); border-radius:3px; padding:1px 5px; margin-right:6px; vertical-align:middle; text-shadow:none; }
   #serie { right:16px; bottom:190px; display:flex; gap:10px; align-items:center; border:1px solid rgba(255,215,122,.35); }
@@ -318,6 +318,7 @@
         <label class="campo" title="Baixa: sem sombras nem efeitos (celular fraco). Média: sombras, brilho e cor. Alta: + oclusão de ambiente e sombras 4K. Recarrega a página.">Gráficos<select id="qualidade"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select></label>
         <label class="campo">Sensibilidade<input type="range" id="sens" min="0.3" max="3" step="0.1" value="1"></label>
         <label class="campo">Campo de visão<input type="range" id="fov" min="65" max="100" step="1" value="75"></label>
+        <label class="campo" title="Automático detecta. Se o mouse não travar no PC, escolha PC. Recarrega a página.">Controles<select id="controles"><option value="auto">Automático</option><option value="pc">PC (mouse)</option><option value="celular">Celular (toque)</option></select></label>
         <label class="chave">Locutor<input type="checkbox" id="locutor" checked></label>
       </div></div>
       <div><div class="rot">SALA ONLINE</div><div class="online">
@@ -8259,7 +8260,10 @@ const NOMES_T = ['Sombra', 'Falcão', 'Brasa', 'Vulto', 'Lobo'];
 const NOMES_CT = ['Águia', 'Tigre', 'Rocha', 'Norte', 'Cobra'];
 
 // ====================== CENA ======================
-const MOBILE = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches && navigator.maxTouchPoints > 0);
+// Controles: 'auto' detecta; 'pc' força mouse/teclado; 'celular' força toque. PC com tela sensível ao toque era detectado como celular (mouse não travava).
+let CTRL_PREF = 'auto'; try { CTRL_PREF = localStorage.getItem('controles') || 'auto'; } catch (e) {}
+const MOBILE_AUTO = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches && navigator.maxTouchPoints > 0);
+const MOBILE = CTRL_PREF === 'celular' ? true : CTRL_PREF === 'pc' ? false : MOBILE_AUTO;
 if (MOBILE) document.body.classList.add('mobile');
 const canvas = document.getElementById('jogo');
 let QUAL = 'media'; try { QUAL = localStorage.getItem('qualidade') || (localStorage.getItem('graficosLeves') === '1' ? 'baixa' : 'media'); } catch (e) {}
@@ -11975,6 +11979,7 @@ function olharToque(dx, dy) {
   const sens = 0.0045 * sensibilidade * (jogador.zoom ? 0.4 : 1);
   jogador.yaw -= dx * sens; jogador.pitch = Math.max(-1.5, Math.min(1.5, jogador.pitch - dy * sens));
 }
+if (MOBILE && CTRL_PREF === 'auto') { let n = 0; addEventListener('mousemove', e => { if (e.movementX || e.movementY) { if (++n > 25 && $('onlineStatus') && !window._avisouMouse) { window._avisouMouse = true; const el = $('onlineStatus'); el.textContent = 'Detectei um mouse. Se estiver no PC, mude "Controles" para "PC (mouse)".'; el.style.color = '#ffd77a'; } } }); }
 function iniciarToque() {
   if (!MOBILE) return;
   $('inicio').querySelector('.soMobile').hidden = false;
@@ -12437,6 +12442,7 @@ $('btnJogar').onclick = () => {
 };
 $('btnDeNovo').onclick = () => { $('fim').hidden = true; $('inicio').hidden = false; partida.estado = 'inicio'; };
 for (const r of document.querySelectorAll('input[name=mapa]')) r.onchange = () => { if (r.checked && partida.estado === 'inicio') carregarMapa(r.value); };
+$('controles').value = CTRL_PREF; $('controles').onchange = () => { try { localStorage.setItem('controles', $('controles').value); } catch (e) {} location.reload(); };
 $('qualidade').value = QUAL; $('qualidade').onchange = () => { try { localStorage.setItem('qualidade', $('qualidade').value); localStorage.removeItem('graficosLeves'); } catch (e) {} location.reload(); };
 montarPos();
 carregarModeloSoldado();
