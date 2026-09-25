@@ -9689,14 +9689,35 @@ function geoCilindroZ(r, len, seg = 12, r2) { // cilindro deitado ao longo de z
 }
 // ---- modelos das armas (escala real, empunhadura na origem, cano para -z) — usados nos bots, no chão e em primeira pessoa ----
 let MATS_ARMA = null;
+// texturas das armas geradas em canvas: metal gasto (riscos e bordas), grão de madeira e polímero granulado
+function texArma(tipo) {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+  if (tipo === 'madeira') {
+    x.fillStyle = '#8a8a8a'; x.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 90; i++) { const y0 = Math.random() * 256, a = 0.05 + Math.random() * 0.18; x.strokeStyle = `rgba(${Math.random() < 0.5 ? '40,40,40' : '200,200,200'},${a})`; x.lineWidth = 0.6 + Math.random() * 2.2; x.beginPath(); x.moveTo(0, y0); for (let k = 0; k <= 256; k += 16) x.lineTo(k, y0 + Math.sin(k * 0.03 + i) * 3 + (Math.random() - 0.5) * 1.5); x.stroke(); }
+  } else {
+    x.fillStyle = tipo === 'metal' ? '#9a9a9a' : '#8c8c8c'; x.fillRect(0, 0, 256, 256);
+    const img = x.getImageData(0, 0, 256, 256), d = img.data; for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - 0.5) * (tipo === 'metal' ? 26 : 40); d[i] += n; d[i + 1] += n; d[i + 2] += n; } x.putImageData(img, 0, 0);
+    if (tipo === 'metal') for (let i = 0; i < 70; i++) { x.strokeStyle = `rgba(235,235,235,${0.08 + Math.random() * 0.25})`; x.lineWidth = 0.5 + Math.random(); x.beginPath(); const px = Math.random() * 256, py = Math.random() * 256, ang = Math.random() * 6, L = 6 + Math.random() * 40; x.moveTo(px, py); x.lineTo(px + Math.cos(ang) * L, py + Math.sin(ang) * L); x.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3); t.anisotropy = 4; return t;
+}
 function matsArma() {
   if (MATS_ARMA) return MATS_ARMA;
-  return MATS_ARMA = {
+  const tm = texArma('metal'), tw = texArma('madeira'), tp = texArma('polimero');
+  const detalhe = (m, t, bump = 0.002) => { m.roughnessMap = t; m.bumpMap = t; m.bumpScale = bump; m.envMapIntensity = 1.3; m.needsUpdate = true; return m; };
+  const cor = (m, t) => { m.map = t; m.needsUpdate = true; return m; };
+  MATS_ARMA = {
     esc: mat('#1b1f25', { metalness: 0.75, roughness: 0.32 }), med: mat('#343a43', { metalness: 0.6, roughness: 0.42 }), pol: mat('#22262b', { metalness: 0.15, roughness: 0.65 }),
     tan: mat('#a8916a', { metalness: 0.1, roughness: 0.7 }), mad: mat('#7a4a22', { roughness: 0.6, metalness: 0.05 }), verde: mat('#4a5a3a', { roughness: 0.7, metalness: 0.2 }),
     oliva: mat('#5c6b3c', { roughness: 0.8 }), laranja: mat('#8a3a12', { roughness: 0.5, metalness: 0.2 }), branco: mat('#e8e8e8', { roughness: 0.4 }), vermelho: mat('#c8282a', { emissive: corLinear('#ff2020'), emissiveIntensity: 0.6 }),
     lente: mat('#3a6aa0', { metalness: 0.3, roughness: 0.15 }), lamina: mat('#d5dbe2', { metalness: 0.9, roughness: 0.15 }),
   };
+  const M = MATS_ARMA;
+  detalhe(M.esc, tm); detalhe(M.med, tm); detalhe(M.pol, tp, 0.003); detalhe(M.tan, tp, 0.003); detalhe(M.verde, tp, 0.003); detalhe(M.oliva, tp, 0.003); detalhe(M.lamina, tm, 0.001);
+  cor(detalhe(M.mad, tw, 0.003), tw); cor(detalhe(M.laranja, tw, 0.003), tw);
+  M.esc.roughness = 0.55; M.med.roughness = 0.6; M.mad.roughness = 0.75; M.laranja.color.copy(corLinear('#7a3814'));
+  return M;
 }
 // devolve { ponta: z da boca do cano, canos: grupo que gira (minigun), foguete: malha do projétil (bazuca), maoE: posição da mão de apoio }
 function modeloArma(chave, g) {
@@ -9871,6 +9892,15 @@ function girarOssoMundo(osso, qMundo) { // aplica uma rotação (em espaço de m
 }
 function girarOssoEixo(osso, eixo, ang) { if (Math.abs(ang) > 1e-4) girarOssoMundo(osso, _qa.setFromAxisAngle(eixo, ang)); }
 function apontarOsso(osso, filho, dir) { osso.getWorldPosition(_va); filho.getWorldPosition(_vb); _vb.sub(_va).normalize(); girarOssoMundo(osso, _qa.setFromUnitVectors(_vb, dir)); }
+// gira a mão em volta do eixo dos dedos até o polegar apontar (o mais perto possível) para dirPolegar
+function torcerMao(mao, dedo, polegar, dirPolegar) {
+  if (!mao || !dedo || !polegar) return;
+  const eixo = dedo.getWorldPosition(new THREE.Vector3()).sub(mao.getWorldPosition(_va)).normalize();
+  const a1 = polegar.getWorldPosition(new THREE.Vector3()).sub(mao.getWorldPosition(_va)); a1.addScaledVector(eixo, -a1.dot(eixo)).normalize();
+  const a2 = dirPolegar.clone().addScaledVector(eixo, -dirPolegar.dot(eixo)).normalize(); if (a1.lengthSq() < 1e-6 || a2.lengthSq() < 1e-6) return;
+  let ang = Math.acos(Math.max(-1, Math.min(1, a1.dot(a2)))); if (new THREE.Vector3().crossVectors(a1, a2).dot(eixo) < 0) ang = -ang;
+  girarOssoEixo(mao, eixo, ang);
+}
 function ikDoisOssos(o1, o2, o3, alvo, polo) { // braço → antebraço → mão alcançam o alvo; o cotovelo aponta para o polo
   const S = o1.getWorldPosition(new THREE.Vector3()), E = o2.getWorldPosition(new THREE.Vector3()), H = o3.getWorldPosition(new THREE.Vector3());
   const L1 = S.distanceTo(E), L2 = E.distanceTo(H);
@@ -11252,8 +11282,8 @@ const partesArma = {};
 function construirArmaVisual() {
   while (armaVisual.children.length) armaVisual.remove(armaVisual.children[0]);
   const a = jogador.arma, T = jogador.time === 't', g = armaVisual;
-  const mEsc = mat('#1b1f25', { metalness: 0.75, roughness: 0.32 }), mMed = mat('#343a43', { metalness: 0.6, roughness: 0.42 }), mPol = mat('#22262b', { metalness: 0.15, roughness: 0.65 });
-  const mMad = mat('#6a4424', { roughness: 0.65, metalness: 0.05 }), mPele = mat('#d9a877', { roughness: 0.8 }), mManga = mat(T ? '#9a7a4e' : '#4d6480', { roughness: 0.85 }), mBranco = mat('#e8e8e8', { roughness: 0.4 });
+  const MA = matsArma(), mEsc = MA.esc, mMed = MA.med, mPol = MA.pol;
+  const mMad = MA.mad, mPele = mat('#d9a877', { roughness: 0.8 }), mManga = mat(T ? '#9a7a4e' : '#4d6480', { roughness: 0.85 }), mBranco = mat('#e8e8e8', { roughness: 0.4 });
   const P = (geo, m, x, y, z, rx = 0, ry = 0, rz = 0) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.rotation.set(rx, ry, rz); g.add(mesh); return mesh; };
   const guardaGatilho = (x, y, z, r = 0.02) => { const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.0035, 6, 14, Math.PI), mEsc); t.position.set(x, y, z); t.rotation.set(0, Math.PI / 2, Math.PI); g.add(t); const gat = P(geoArredondada(0.006, 0.02, 0.008, 0.002), mEsc, x, y - 0.005, z + 0.004, 0.3); return t; };
   const mira = (z, alt = 0.04) => { P(geoArredondada(0.004, 0.018, 0.006, 0.001), mBranco, 0, alt, z); };
@@ -11303,15 +11333,16 @@ function construirArmaVisual() {
   g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 10; } });
   // braços realistas: as mãos antigas viram só os alvos (punho = centro da mão um pouco para trás)
   const maos = g.children.filter(o => o.material === mPele).sort((p, q) => q.position.x - p.position.x), mangas = g.children.filter(o => o.material === mManga);
-  const ajMao = a.tipo === 'pistola' ? new THREE.Vector3(0.03, 0.04, 0.035) : new THREE.Vector3(0.0, 0.0, 0.035); // na pistola as mãos sobem na empunhadura
+  const ajMao = a.tipo === 'pistola' ? (window.AJ_P ? new THREE.Vector3(...window.AJ_P) : new THREE.Vector3(0.02, 0.01, 0.045)) : new THREE.Vector3(0.0, 0.0, 0.035); // na pistola as mãos sobem na empunhadura
   bracosFP.alvoD = maos[0] ? maos[0].position.clone().add(ajMao) : null;
-  bracosFP.alvoE = a.tipo === 'pistola' ? null : maos[1] ? maos[1].position.clone().add(new THREE.Vector3(0.0, -0.005, 0.05)) : null; // pistola: mão esquerda por baixo da direita
+  bracosFP.alvoE = a.tipo === 'pistola' ? null : maos[1] ? maos[1].position.clone().add(window.AJ_E ? new THREE.Vector3(...window.AJ_E) : new THREE.Vector3(-0.025, -0.06, 0.07)) : null; // pistola: mão esquerda por baixo da direita
   prepararBracosFP();
   if (bracosFP.obj) for (const o of [...maos, ...mangas]) o.visible = false;
 }
 const luzCano = new THREE.PointLight(0xffc070, 0, 7, 2); luzCano.position.set(0.2, -0.1, -0.8); camera.add(luzCano);
 // ---- braços em 1ª pessoa com o mesmo soldado realista (luvas, mangas da equipe) ----
-const OFFSET_VM = { nada: [0, 0, 0], longa: [-0.01, 0.045, 0.03], smg: [-0.01, 0.045, 0.03], fuzil: [-0.01, 0.045, 0.03], sniper: [-0.01, 0.045, 0.03], pistola: [-0.05, 0.075, 0.05], faca: [-0.02, 0.06, 0.04], mg: [0, 0.035, 0.02], lancador: [0, 0.02, 0] };
+// deslocamento da arma em 1ª pessoa (x, y, z) com braços realistas + giro do corpo (postura): arma maior e mais perto, como nos FPS atuais
+const OFFSET_VM = { nada: [0, 0, 0, 0], longa: [0, 0.075, 0.03, -0.4, 0.12, 0], smg: [0, 0.075, 0.04, -0.4, 0.12, 0], fuzil: [0, 0.075, 0.03, -0.4, 0.12, 0], sniper: [0, 0.07, 0.02, -0.4, 0.1, 0], pistola: [-0.03, 0.08, -0.03, -0.05, 0.1, 0], faca: [-0.03, 0.06, 0.08, -0.1, 0.08, 0], mg: [0, 0.035, 0.05, -0.25, 0.06, 0], lancador: [0, 0.02, 0, 0, 0, 0] };
 var bracosFP = { obj: null, time: null, O: null, mix: null, alvoD: null, alvoE: null };
 function prepararBracosFP() {
   if (!MODELO.pronto || !jogador) return;
@@ -11325,7 +11356,7 @@ function prepararBracosFP() {
   if (O.LeftArm && O.RightArm) { const lin = O.RightArm.getWorldPosition(new THREE.Vector3()).sub(O.LeftArm.getWorldPosition(new THREE.Vector3())); m.rotation.y = Math.atan2(lin.z, lin.x); m.updateMatrixWorld(true); } // ombros paralelos à tela
   const om = O.LeftArm && O.RightArm ? O.LeftArm.getWorldPosition(new THREE.Vector3()).add(O.RightArm.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5) : new THREE.Vector3(0, 1.45, 0);
   m.position.set(-om.x, -0.45 - om.y, -0.2 - om.z); // ombros 45 cm abaixo e 20 cm à frente dos olhos: tronco e cabeça ficam fora do quadro
-  camera.add(m); Object.assign(bracosFP, { obj: m, time: jogador.time, O, mix, pose: salvarPose(O) });
+  camera.add(m); Object.assign(bracosFP, { obj: m, time: jogador.time, O, mix, pose: salvarPose(O), rotBase: m.rotation.y, omLocal: om.clone(), postura: 0 });
 }
 // fecha os dedos em volta da empunhadura: cada falange gira no eixo que cruza os nós dos dedos (indicador → mínimo)
 function fecharDedos(O, lado, ang) {
@@ -11337,6 +11368,8 @@ function atualizarBracosFP() {
   const b = bracosFP, O = b.O; if (!b.obj) return;
   const vis = armaVisual.visible && jogador && jogador.vivo && b.alvoD; b.obj.visible = !!vis; if (!vis) return;
   restaurarPose(b.pose); if (O.Neck) O.Neck.scale.setScalar(0.001);
+  { const alvoP = (OFFSET_VM[jogador.arma.tipo] || OFFSET_VM.longa)[3]; b.postura += (alvoP - b.postura) * 0.15; // postura: ombro esquerdo à frente nas armas longas
+    b.obj.rotation.y = b.rotBase + b.postura; const om = b.omLocal.clone().applyAxisAngle(EIXO_Y, b.postura); b.obj.position.set(-om.x + 0.03, -0.45 - om.y, -0.2 - om.z); }
   camera.updateMatrixWorld(true); armaVisual.updateMatrixWorld(true);
   const qA = armaVisual.getWorldQuaternion(new THREE.Quaternion()), fA = new THREE.Vector3(0, 0, -1).applyQuaternion(qA), bA = new THREE.Vector3(0, -1, 0).applyQuaternion(qA), dA = new THREE.Vector3(1, 0, 0).applyQuaternion(qA);
   const lado = (braco, ante, mao, dedo, alvoLocal, s) => {
@@ -11344,8 +11377,11 @@ function atualizarBracosFP() {
     const alvo = armaVisual.localToWorld(alvoLocal.clone()), S = O[braco].getWorldPosition(new THREE.Vector3());
     const L = O[braco].getWorldPosition(_va).distanceTo(O[ante].getWorldPosition(_vb)) + O[ante].getWorldPosition(_va).distanceTo(O[mao].getWorldPosition(_vb));
     const esc = Math.max(1, Math.min(1.15, S.distanceTo(alvo) / (L * 0.93))); O[braco].scale.setScalar(esc); O[mao].scale.setScalar(1 / esc); O[braco].updateMatrixWorld(true);
-    ikDoisOssos(O[braco], O[ante], O[mao], alvo, camera.localToWorld(new THREE.Vector3(0.7 * s, -1, 0.35)));
-    if (O[dedo]) apontarOsso(O[mao], O[dedo], s > 0 ? fA.clone().multiplyScalar(0.55).addScaledVector(bA, 0.35).addScaledVector(dA, -0.55).normalize() : fA.clone().multiplyScalar(0.8).addScaledVector(dA, 0.45).addScaledVector(bA, 0.2).normalize());
+    const pist = jogador.arma.tipo === 'pistola';
+    ikDoisOssos(O[braco], O[ante], O[mao], alvo, camera.localToWorld(pist ? new THREE.Vector3(0.3 * s, -1, 0.05) : new THREE.Vector3(0.7 * s, -1, 0.35)));
+    const cA = bA.clone().negate(), DP = window.DIR_PIST || [0.7, -0.2, -0.4];
+    if (O[dedo] && pist && s > 0) { apontarOsso(O[mao], O[dedo], fA.clone().multiplyScalar(DP[0]).addScaledVector(cA, DP[1]).addScaledVector(dA, DP[2]).normalize()); const TP = window.POL_PIST || [0.3, 0.8, 0.3]; torcerMao(O[mao], O[dedo], O.RightHandThumb1, fA.clone().multiplyScalar(TP[0]).addScaledVector(cA, TP[1]).addScaledVector(dA, TP[2]).normalize()); }
+    else if (O[dedo]) apontarOsso(O[mao], O[dedo], s > 0 ? fA.clone().multiplyScalar(0.55).addScaledVector(bA, 0.35).addScaledVector(dA, -0.55).normalize() : fA.clone().multiplyScalar(0.6).addScaledVector(dA, 0.55).addScaledVector(bA, -0.35).normalize());
   };
   lado('RightArm', 'RightForeArm', 'RightHand', 'RightHandMiddle1', b.alvoD, 1);
   fecharDedos(O, 'Right', window.CURVA_D === undefined ? -0.6 : window.CURVA_D);
@@ -11402,7 +11438,7 @@ function atualizarCamera(dt) {
   armaVisual.position.set(ov[0] + 0.22 + Math.sin(balanco * 0.5) * 0.01 * Math.min(1, velH / 3) + rec * 0.05, -0.2 - rec * 0.14 - troca * 0.45 + Math.abs(bob) * 0.5 - pouso, -0.4 + recuoV * 0.5);
   const respira = Math.sin(tempo * 1.3) * 0.004, respira2 = Math.cos(tempo * 0.9) * 0.003;
   armaVisual.position.x += respira; armaVisual.position.y += respira2 + ov[1]; armaVisual.position.z += ov[2];
-  armaVisual.rotation.set(-recuoV * 1.4 + rec * 0.55 + troca * 0.8 + respira2 * 2, 0.04 + rec * 0.35 + respira * 2, rec * 0.25);
+  armaVisual.rotation.set(-recuoV * 1.4 + rec * 0.55 + troca * 0.8 + respira2 * 2 + (ov[5] || 0), 0.04 + rec * 0.35 + respira * 2 + (ov[4] || 0), rec * 0.25);
   atualizarBracosFP();
   flashTimer -= dt; if (flashTimer <= 0 && partesArma.flash) partesArma.flash.visible = false;
   luzCano.intensity = Math.max(0, luzCano.intensity - dt * 40);
