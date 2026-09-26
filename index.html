@@ -11350,7 +11350,7 @@ function construirArmaVisual() {
   g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 10; o.userData.saoVisto = false; o.layers.disable(2); } });
   // braços realistas: as mãos antigas viram só os alvos (punho = centro da mão um pouco para trás)
   const maos = g.children.filter(o => o.material === mPele).sort((p, q) => q.position.x - p.position.x), mangas = g.children.filter(o => o.material === mManga);
-  const ajMao = a.tipo === 'faca' ? (window.AJ_F ? new THREE.Vector3(...window.AJ_F) : new THREE.Vector3(0.03, 0.05, 0.14)) : a.tipo === 'pistola' ? (window.AJ_P ? new THREE.Vector3(...window.AJ_P) : new THREE.Vector3(0.02, 0.035, 0.04)) : new THREE.Vector3(0.0, 0.0, 0.035); // na pistola as mãos sobem na empunhadura
+  const ajMao = a.tipo === 'faca' ? (window.AJ_F ? new THREE.Vector3(...window.AJ_F) : new THREE.Vector3(0.03, 0.05, 0.14)) : a.tipo === 'pistola' ? (window.AJ_P ? new THREE.Vector3(...window.AJ_P) : new THREE.Vector3(0.015, 0.075, 0.02)) // punho sobe até o cabo entrar na palma (sem vão entre a mão e o ferrolho) : new THREE.Vector3(0.0, 0.0, 0.035); // na pistola as mãos sobem na empunhadura
   bracosFP.alvoD = maos[0] ? maos[0].position.clone().add(ajMao) : null;
   bracosFP.alvoE = a.tipo === 'pistola' && bracosFP.alvoD ? bracosFP.alvoD.clone().add(window.AJ_E2 ? new THREE.Vector3(...window.AJ_E2) : new THREE.Vector3(-0.05, -0.045, 0.02)) : maos[1] ? maos[1].position.clone().add(window.AJ_E ? new THREE.Vector3(...window.AJ_E) : new THREE.Vector3(-0.025, -0.06, 0.07)) : null; // pistola: mão esquerda por baixo da direita
   prepararBracosFP();
@@ -11360,7 +11360,7 @@ const luzCano = new THREE.PointLight(0xffc070, 0, 7, 2); luzCano.position.set(0.
 // ---- braços em 1ª pessoa com o mesmo soldado realista (luvas, mangas da equipe) ----
 // deslocamento da arma em 1ª pessoa (x, y, z) com braços realistas + giro do corpo (postura): arma maior e mais perto, como nos FPS atuais
 const OFFSET_VM = { nada: [0, 0, 0, 0], longa: [0, 0.075, 0.03, -0.4, 0.12, 0], smg: [0, 0.075, 0.04, -0.4, 0.12, 0], fuzil: [0, 0.075, 0.03, -0.4, 0.12, 0], sniper: [0, 0.07, 0.02, -0.4, 0.1, 0], pistola: [-0.16, 0.16, 0.1, 0, 0.04, 0.03], faca: [-0.06, 0.13, 0.04, -0.05, 0.2, 0.05], mg: [0, 0.035, 0.05, -0.25, 0.06, 0], lancador: [0, 0.02, 0, 0, 0, 0] };
-const ESCALA_VM = { pistola: 1.1, faca: 1.15 }; // arma pequena maior na tela (mais perto do rosto), como nos FPS
+const ESCALA_VM = { pistola: 1.0, faca: 1.15 }; // pistola compacta em escala real // arma pequena maior na tela (mais perto do rosto), como nos FPS
 // posição dos ombros em relação aos olhos (x, y, z) por tipo de arma: na pistola o corpo fica mais atrás e abaixo, braços estendidos à frente
 const CORPO_VM = { longa: [0.03, -0.45, -0.2], pistola: [0.03, -0.5, -0.02], faca: [0.03, -0.5, -0.06] };
 var bracosFP = { obj: null, time: null, O: null, mix: null, alvoD: null, alvoE: null };
@@ -11408,9 +11408,9 @@ function atualizarBracosFP() {
     else if (O[dedo]) apontarOsso(O[mao], O[dedo], s > 0 ? fA.clone().multiplyScalar(0.55).addScaledVector(bA, 0.35).addScaledVector(dA, -0.55).normalize() : fA.clone().multiplyScalar(0.6).addScaledVector(dA, 0.55).addScaledVector(bA, -0.35).normalize());
   };
   lado('RightArm', 'RightForeArm', 'RightHand', 'RightHandMiddle1', b.alvoD, 1);
-  fecharDedos(O, 'Right', window.CURVA_D === undefined ? -0.6 : window.CURVA_D);
+  fecharDedos(O, 'Right', window.CURVA_D === undefined ? -0.8 : window.CURVA_D);
   lado('LeftArm', 'LeftForeArm', 'LeftHand', 'LeftHandMiddle1', b.alvoE || new THREE.Vector3(-0.3, -0.5, 0.25), -1);
-  if (b.alvoE) fecharDedos(O, 'Left', window.CURVA_E === undefined ? -0.4 : window.CURVA_E);
+  if (b.alvoE) fecharDedos(O, 'Left', window.CURVA_E === undefined ? -0.55 : window.CURVA_E);
 }
 function recuoVisual(r) { recuoV = Math.min(0.25, recuoV + r * 3); }
 const matCapsula = new THREE.MeshBasicMaterial({ color: corLinear('#d9b34a') });
