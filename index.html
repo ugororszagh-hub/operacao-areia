@@ -9869,7 +9869,7 @@ const MATS_SOLD = {};
 // posições da arma no espaço do "peito" (x, y, z, inclinação, giro): [pronto, mirando]
 const POSES_ARMA = {
   longa:    [[0.12, 0.24, -0.2, -0.28, 0.12], [0.1, 0.37, -0.2, 0, 0]],
-  pistola:  [[0.07, 0.2, -0.26, -0.35, 0], [0.04, 0.39, -0.4, 0, 0]],
+  pistola:  [[0.08, 0.27, -0.3, -0.5, 0.05], [0.04, 0.39, -0.4, 0, 0]],
   mg:       [[0.16, 0.1, -0.1, -0.1, 0.1], [0.14, 0.14, -0.14, 0, 0]],
   lancador: [[0.19, 0.44, 0.04, -0.1, 0], [0.17, 0.46, 0.02, 0, 0]],
   faca:     [[0.2, 0.14, -0.2, -0.5, 0], [0.18, 0.2, -0.26, -0.3, 0]],
@@ -10135,8 +10135,15 @@ class Soldado {
       if (O.LeftArm) { const S = O.LeftArm.getWorldPosition(_ve); ikDoisOssos(O.LeftArm, O.LeftForeArm, O.LeftHand, maoE, S.clone().addScaledVector(baixo, 1).addScaledVector(direita, -0.6).addScaledVector(tras, 0.1)); }
       // punhos alinhados com a arma
       const fArma = new THREE.Vector3(0, 0, -1).applyQuaternion(p.arma.getWorldQuaternion(new THREE.Quaternion())), bArma = new THREE.Vector3(0, -1, 0).applyQuaternion(p.arma.getWorldQuaternion(new THREE.Quaternion()));
-      if (O.RightHand && O.RightHandMiddle1) apontarOsso(O.RightHand, O.RightHandMiddle1, fArma.clone().multiplyScalar(0.55).addScaledVector(bArma, 0.35).addScaledVector(direita, -0.55).normalize());
-      if (O.LeftHand && O.LeftHandMiddle1) apontarOsso(O.LeftHand, O.LeftHandMiddle1, fArma.clone().multiplyScalar(0.8).addScaledVector(direita, 0.45).addScaledVector(bArma, 0.2).normalize());
+      const cArma = bArma.clone().negate(), dArma = new THREE.Vector3(1, 0, 0).applyQuaternion(p.arma.getWorldQuaternion(new THREE.Quaternion())), ehPist = a && (a.tipo === 'pistola' || a.tipo === 'faca');
+      if (ehPist) { // mesma pegada da 1ª pessoa: mão em pé na empunhadura, polegar para cima; esquerda apoia por baixo/lado
+        if (O.RightHand && O.RightHandMiddle1) { apontarOsso(O.RightHand, O.RightHandMiddle1, fArma.clone().multiplyScalar(0.7).addScaledVector(cArma, -0.2).addScaledVector(dArma, -0.4).normalize()); torcerMao(O.RightHand, O.RightHandMiddle1, O.RightHandThumb1, fArma.clone().multiplyScalar(0.3).addScaledVector(cArma, 0.8).addScaledVector(dArma, 0.3).normalize()); }
+        if (O.LeftHand && O.LeftHandMiddle1) { apontarOsso(O.LeftHand, O.LeftHandMiddle1, fArma.clone().multiplyScalar(0.5).addScaledVector(dArma, 0.6).addScaledVector(cArma, -0.3).normalize()); torcerMao(O.LeftHand, O.LeftHandMiddle1, O.LeftHandThumb1, cArma.clone().multiplyScalar(0.8).addScaledVector(fArma, 0.3).normalize()); }
+      } else {
+        if (O.RightHand && O.RightHandMiddle1) apontarOsso(O.RightHand, O.RightHandMiddle1, fArma.clone().multiplyScalar(0.55).addScaledVector(bArma, 0.35).addScaledVector(direita, -0.55).normalize());
+        if (O.LeftHand && O.LeftHandMiddle1) apontarOsso(O.LeftHand, O.LeftHandMiddle1, fArma.clone().multiplyScalar(0.8).addScaledVector(direita, 0.45).addScaledVector(bArma, 0.2).normalize());
+      }
+      fecharDedos(O, 'Right', -0.6); fecharDedos(O, 'Left', a && a.tipo === 'faca' ? -0.2 : -0.4); // dedos fechados na empunhadura
       p.clarao.visible = this.flashBot > 0; if (this.flashBot > 0) p.clarao.material.rotation = Math.random() * 6;
     } else {
       // queda: joelhos cedem e o corpo tomba (para trás ou para frente, conforme o tiro)
