@@ -11350,7 +11350,7 @@ function construirArmaVisual() {
   g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 10; o.userData.saoVisto = false; o.layers.disable(2); } });
   // braços realistas: as mãos antigas viram só os alvos (punho = centro da mão um pouco para trás)
   const maos = g.children.filter(o => o.material === mPele).sort((p, q) => q.position.x - p.position.x), mangas = g.children.filter(o => o.material === mManga);
-  const ajMao = a.tipo === 'faca' ? (window.AJ_F ? new THREE.Vector3(...window.AJ_F) : new THREE.Vector3(0.03, 0.05, 0.14)) : a.tipo === 'pistola' ? (window.AJ_P ? new THREE.Vector3(...window.AJ_P) : new THREE.Vector3(0.015, 0.075, 0.02)) // punho sobe até o cabo entrar na palma (sem vão entre a mão e o ferrolho) : new THREE.Vector3(0.0, 0.0, 0.035); // na pistola as mãos sobem na empunhadura
+  const ajMao = a.tipo === 'faca' ? (window.AJ_F ? new THREE.Vector3(...window.AJ_F) : new THREE.Vector3(0.03, 0.05, 0.14)) : a.tipo === 'pistola' ? (window.AJ_P ? new THREE.Vector3(...window.AJ_P) : new THREE.Vector3(0.015, 0.075, 0.02)) /* punho sobe até o cabo entrar na palma (sem vão entre a mão e o ferrolho) */ : new THREE.Vector3(0.0, 0.0, 0.035); // na pistola as mãos sobem na empunhadura
   bracosFP.alvoD = maos[0] ? maos[0].position.clone().add(ajMao) : null;
   bracosFP.alvoE = a.tipo === 'pistola' && bracosFP.alvoD ? bracosFP.alvoD.clone().add(window.AJ_E2 ? new THREE.Vector3(...window.AJ_E2) : new THREE.Vector3(-0.05, -0.045, 0.02)) : maos[1] ? maos[1].position.clone().add(window.AJ_E ? new THREE.Vector3(...window.AJ_E) : new THREE.Vector3(-0.025, -0.06, 0.07)) : null; // pistola: mão esquerda por baixo da direita
   prepararBracosFP();
