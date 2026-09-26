@@ -9957,7 +9957,7 @@ function encaixeArma(O, pega, fam, dirMira, kMira) {
   return { pos: H.worldToLocal(posMundo.clone()), quat: qH.invert().multiply(qMundo), esc: 1 / sH };
 }
 const PEGA_ARMA = { pistola: new THREE.Vector3(0, -0.075, 0.02), faca: new THREE.Vector3(0, -0.05, 0.05), mg: new THREE.Vector3(0.05, -0.06, 0.16), lancador: new THREE.Vector3(0, -0.06, 0.02), padrao: new THREE.Vector3(0, -0.065, 0.02) };
-const AJUSTE_ENCAIXE = { pistola: [0, 0, 0, 0, 0, 0], padrao: [0, 0, 0, 0, 0, 0] }; // afinação fina (m, m, m, rad, rad, rad) por tipo
+const AJUSTE_ENCAIXE = { pistola: [0, -0.05, 0.01, 0, 0, 0], faca: [0, -0.05, 0.01, 0, 0, 0], padrao: [0, 0, 0, 0, 0, 0] }; // pistola 5 cm mais baixa: o cabo atravessa o punho e o ferrolho apoia em cima da mão // afinação fina (m, m, m, rad, rad, rad) por tipo
 function familiaArma(a) { return a && (a.tipo === 'pistola' || a.tipo === 'faca') ? 'pistol' : 'rifle'; }
 function carregarModeloSoldado() {
   if (MODELO.carregando || !THREE.GLTFLoader || !THREE.SkeletonUtils) return; MODELO.carregando = true;
