@@ -11361,7 +11361,9 @@ function prepararBracosFP() {
   if (bracosFP.obj) camera.remove(bracosFP.obj);
   const m = THREE.SkeletonUtils.clone(MODELO.gltf.scene); m.scale.multiplyScalar(MODELO.escala);
   const O = {}, mats = MODELO.mats[jogador.time];
-  m.traverse(o => { if (o.isBone) O[o.name.replace(/^mixamorig:?/, '')] = o; if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; o.renderOrder = 10; if (mats[o.material.name]) o.material = mats[o.material.name]; } });
+  if (!bracosFP.matsFP) bracosFP.matsFP = {}; if (!bracosFP.matsFP[jogador.time]) { const mm = {}; for (const [n, mt] of Object.entries(mats)) { mm[n] = mt.clone(); mm[n].side = THREE.FrontSide; } bracosFP.matsFP[jogador.time] = mm; }
+  const matsFP = bracosFP.matsFP[jogador.time];
+  m.traverse(o => { if (o.isBone) O[o.name.replace(/^mixamorig:?/, '')] = o; if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; o.renderOrder = 10; if (matsFP[o.material.name]) o.material = matsFP[o.material.name]; } });
   const mix = new THREE.AnimationMixer(m), base = MODELO.gltf.animations.find(c => /idle/i.test(c.name)) || MODELO.gltf.animations[0]; if (base) mix.clipAction(base).play(); mix.update(0);
   m.updateMatrixWorld(true);
   if (O.LeftArm && O.RightArm) { const lin = O.RightArm.getWorldPosition(new THREE.Vector3()).sub(O.LeftArm.getWorldPosition(new THREE.Vector3())); m.rotation.y = Math.atan2(lin.z, lin.x); m.updateMatrixWorld(true); } // ombros paralelos à tela
@@ -11389,8 +11391,8 @@ function atualizarBracosFP() {
     const L = O[braco].getWorldPosition(_va).distanceTo(O[ante].getWorldPosition(_vb)) + O[ante].getWorldPosition(_va).distanceTo(O[mao].getWorldPosition(_vb));
     const esc = Math.max(1, Math.min(1.15, S.distanceTo(alvo) / (L * 0.93))); O[braco].scale.setScalar(esc); O[mao].scale.setScalar(1 / esc); O[braco].updateMatrixWorld(true);
     const pist = jogador.arma.tipo === 'pistola' || jogador.arma.tipo === 'faca'; // empunhadura vertical: mesma pegada
-    const PP = window.POLO_PIST || [1.1, -0.5, 0.3];
-    ikDoisOssos(O[braco], O[ante], O[mao], alvo, camera.localToWorld(pist ? new THREE.Vector3(PP[0] * s, PP[1], PP[2]) : new THREE.Vector3(0.7 * s, -1, 0.35)));
+    const PP = window.POLO_PIST || [1.0, -0.7, -0.15];
+    ikDoisOssos(O[braco], O[ante], O[mao], alvo, camera.localToWorld(pist ? new THREE.Vector3(PP[0] * s, PP[1], PP[2]) : new THREE.Vector3(0.75 * s, -1, -0.15)));
     const cA = bA.clone().negate(), DP = window.DIR_PIST || [0.7, -0.2, -0.4];
     if (O[dedo] && pist && s > 0) { apontarOsso(O[mao], O[dedo], fA.clone().multiplyScalar(DP[0]).addScaledVector(cA, DP[1]).addScaledVector(dA, DP[2]).normalize()); const TP = window.POL_PIST || [0.3, 0.8, 0.3]; torcerMao(O[mao], O[dedo], O.RightHandThumb1, fA.clone().multiplyScalar(TP[0]).addScaledVector(cA, TP[1]).addScaledVector(dA, TP[2]).normalize()); }
     else if (O[dedo]) apontarOsso(O[mao], O[dedo], s > 0 ? fA.clone().multiplyScalar(0.55).addScaledVector(bA, 0.35).addScaledVector(dA, -0.55).normalize() : fA.clone().multiplyScalar(0.6).addScaledVector(dA, 0.55).addScaledVector(bA, -0.35).normalize());
@@ -12442,6 +12444,11 @@ $('btnCopiarLink').onclick = () => { $('salaLink').select(); try { navigator.cli
 
 $('btnJogar').onclick = () => {
   iniciarAudio();
+  if (!MOBILE && !document.fullscreenElement && document.documentElement.requestFullscreen) { try { const f = document.documentElement.requestFullscreen(); if (f && f.catch) f.catch(() => {}); } catch (e) {} } // tela cheia: o mouse não escapa para o navegador
+  const b = $('btnJogar'); if (b.dataset.carregando) return; b.dataset.carregando = '1'; const rotulo = b.textContent; b.textContent = 'CARREGANDO…';
+  setTimeout(() => { try { comecarPartida(); } finally { b.textContent = rotulo; delete b.dataset.carregando; } }, 40);
+};
+function comecarPartida() {
   const modo = document.querySelector('input[name=modo]:checked').value; let time = document.querySelector('input[name=time]:checked').value;
   dificuldade = parseFloat($('dificuldade').value); sensibilidade = parseFloat($('sens').value); fovBase = parseFloat($('fov').value); $('sens2').value = sensibilidade; $('fov2').value = fovBase;
   time = distribuirTimes(time);
@@ -12453,7 +12460,7 @@ $('btnJogar').onclick = () => {
   canvas.focus(); if (!compraAberta) travarMouse();
 };
 $('btnDeNovo').onclick = () => { $('fim').hidden = true; $('inicio').hidden = false; partida.estado = 'inicio'; };
-for (const r of document.querySelectorAll('input[name=mapa]')) r.onchange = () => { if (r.checked && partida.estado === 'inicio') carregarMapa(r.value); };
+// o mapa só é construído ao clicar JOGAR (construir ao trocar o rádio travava o menu por ~1 s)
 $('controles').value = CTRL_PREF; $('controles').onchange = () => { try { localStorage.setItem('controles', $('controles').value); } catch (e) {} location.reload(); };
 $('qualidade').value = QUAL; $('qualidade').onchange = () => { try { localStorage.setItem('qualidade', $('qualidade').value); localStorage.removeItem('graficosLeves'); } catch (e) {} location.reload(); };
 montarPos();
